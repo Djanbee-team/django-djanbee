@@ -1,2 +1,0 @@
-[console_scripts]
-djanbee = djanbee.cli:cli
