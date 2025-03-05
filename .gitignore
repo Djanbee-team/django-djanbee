@@ -1,0 +1,8 @@
+# Python packaging
+*.egg-info/
+*.egg
+dist/
+build/
+__pycache__/
+*.py[cod]
+*$py.class
