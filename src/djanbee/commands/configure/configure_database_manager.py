@@ -16,7 +16,7 @@ class ConfigureDatabaseManager:
 
         if not self._ensure_installation():
             return
-
+        print("TEST")
         if not self._ensure_service_running():
             return
 
