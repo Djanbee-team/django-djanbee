@@ -199,26 +199,20 @@ class DatabaseManager:
             return False, f"Failed to configure PostgreSQL user: {str(e)}"
 
     # Status check methods
+
     def check_postgres_installation(self) -> Tuple[bool, str]:
         """
-        Check if PostgreSQL is properly installed by verifying both client and server components.
+        Check if PostgreSQL is properly installed by verifying the client component.
 
         Returns:
-            Tuple[bool, str]: (is_installed, location_or_error_message)
+            Tuple[bool, str]: (is_installed, message)
         """
-        # Check for psql client
-        is_client_installed, client_result = (
-            self.os_manager._manager.check_package_installed("psql")
-        )
+        is_client_installed = self.os_manager._manager.check_package_installed("psql")
+
         if not is_client_installed:
             return False, "PostgreSQL client (psql) not found"
 
-        # If both are installed, return the psql location
-        return True, (
-            client_result.stdout.rstrip()
-            if hasattr(client_result, "stdout")
-            else "PostgreSQL installed"
-        )
+        return True, "PostgreSQL installed"
 
     def check_postgres_status(self) -> bool:
         is_active = self.os_manager._manager.check_service_status("postgresql")
