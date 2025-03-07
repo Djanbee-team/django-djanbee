@@ -1,13 +1,12 @@
 from ...managers import ConsoleManager
 from ...widgets.checkbox_selector import CheckboxSelector
-from ...managers.mixins.project_search import ProjectSearchDisplayMixin
 from ...widgets.text_input import TextInputWidget
 from ...widgets.create_delete_chekbox_selector import CreateDeleteCheckboxSelector
 from ...widgets.list_selector import ListSelector
 from ...widgets.question_selector import QuestionSelector
 
 
-class ConfigureSettingsDisplay(ProjectSearchDisplayMixin):
+class ConfigureSettingsDisplay:
     def __init__(self, console_manager: "ConsoleManager"):
         self.console_manager = console_manager
 

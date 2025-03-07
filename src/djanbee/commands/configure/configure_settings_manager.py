@@ -1,10 +1,12 @@
 from ...core import AppContainer
 from .configure_settings_display import ConfigureSettingsDisplay
-from ...managers.mixins.project_search import ProjectSearchMixin
 from typing import Optional
+from collections import namedtuple
+
+Result = namedtuple("Result", ["valid", "object"])
 
 
-class ConfigureSettingsManager(ProjectSearchMixin):
+class ConfigureSettingsManager:
     def __init__(self, display: ConfigureSettingsDisplay, app: AppContainer):
         self.display = display
         self.app = app
@@ -12,7 +14,8 @@ class ConfigureSettingsManager(ProjectSearchMixin):
     def _configure_settings(self, path="") -> Optional[tuple]:
         """Handle searching for Django projects in subdirectories"""
         # Find and validate project
-        project = self.find_django_project()
+        if not self.app.django_manager.project_service.state.current_project_path:
+            project = self.app.django_manager.project_service.select_project()
         if not project:
             return None
 

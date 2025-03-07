@@ -63,3 +63,8 @@ class BaseOSManager(ABC):
     def is_admin(self) -> bool:
         """Checks if current user has admin privileges"""
         pass
+
+    @abstractmethod
+    def is_venv_directory(self, path: Path) -> bool:
+        """Check if a directory is a virtual environment"""
+        pass
