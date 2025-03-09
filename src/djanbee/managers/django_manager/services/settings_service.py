@@ -1,7 +1,6 @@
 from pathlib import Path
 from ....managers.os_manager import OSManager
 from ..state import DjangoManagerState
-import sys
 from collections import namedtuple
 import re
 from .settings_service_display import DjangoSettingsServiceDisplay
@@ -25,6 +24,20 @@ class DjangoSettingsService:
             return None
         self.display.success_found_settings(settings_file)
         return (True, settings_file)
+
+    def get_settings_path(self):
+        """
+        Get the settings path, using cached value if available or finding it if not.
+        
+        Returns:
+            Path: Path to the settings.py file or None if not found
+        """
+        if self.state.settings_path and self.state.settings_path.exists():
+            return self.state.settings_path
+            
+        self.state.settings_path = self.find_settings_file()
+        return self.state.settings_path
+
 
     def find_settings_file(self) -> Path:
         """Find the settings.py file in the Django project
@@ -58,9 +71,8 @@ class DjangoSettingsService:
         manage_path = self.state.current_project_path / "manage.py"
         if manage_path.exists():
             content = manage_path.read_text()
+            
             # Look for DJANGO_SETTINGS_MODULE pattern
-            import re
-
             settings_module_match = re.search(
                 r'DJANGO_SETTINGS_MODULE["\']?\s*,\s*["\']([^"\']+)["\']', content
             )
@@ -100,11 +112,10 @@ class DjangoSettingsService:
         Returns:
             The value of the setting if found, or the default value if not found
         """
-        if not self.state.settings_path:
-            self.state.settings_path = self.find_settings_file()
-        settings_path = self.state.settings_path
-        if not self.state.settings_path or not self.state.settings_path.exists():
+        settings_path = self.get_settings_path()
+        if not settings_path:
             return default
+        
         # Create a temporary module to execute the settings file
         import importlib.util
         import sys
@@ -151,9 +162,7 @@ class DjangoSettingsService:
             bool: True if the setting was successfully updated, False otherwise
         """
 
-        if not self.state.settings_path:
-            self.state.settings_path = self.find_settings_file()
-        settings_path = self.state.settings_path
+        settings_path = self.get_settings_path()
         if not self.state.settings_path or not self.state.settings_path.exists():
             return False
         # Read the current content
