@@ -1,10 +1,9 @@
-from .display import LaunchDisplayInterface
+from .display import LaunchDisplay
 from ...core import AppContainer
-from ...managers.mixins.project_search import ProjectSearchMixin
 
 
-class LaunchManager(ProjectSearchMixin):
-    def __init__(self, display: LaunchDisplayInterface, app: "AppContainer"):
+class LaunchManager:
+    def __init__(self, display: LaunchDisplay, app: "AppContainer"):
         self.display = display
         self.app = app
 
@@ -18,16 +17,7 @@ class LaunchManager(ProjectSearchMixin):
         self.display.display_splash_screen()
 
         # Initialize directory
-        self._initialize_directory(path)
+        self.app.django_manager.project_service.initialize_directory(path)
 
         # Find and launch Django project
-        project = self.find_django_project()
-        if project:
-            self.display.show_project_opened(project[0], project[1])
-
-    def _initialize_directory(self, path: str) -> None:
-        """Set up the working directory"""
-        if not path:
-            self.app.os_manager.get_dir()
-        else:
-            self.app.os_manager.set_dir(path)
+        project = self.app.django_manager.project_service.select_project()

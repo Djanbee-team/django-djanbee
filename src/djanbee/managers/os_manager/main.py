@@ -2,10 +2,12 @@ import os
 import platform
 import subprocess
 from pathlib import Path
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Tuple
+from collections import namedtuple
 
-from .base import BaseOSManager
 from .os_implementations import UnixOSManager, WindowsOSManager
+
+Result = namedtuple("Result", ["valid", "object"])
 
 
 class OSManager:
@@ -16,20 +18,6 @@ class OSManager:
             self._manager = WindowsOSManager()
         else:
             self._manager = UnixOSManager()
-        self._current_project_path: Optional[Path] = None
-
-    @property
-    def project_path(self) -> Optional[Path]:
-        """Returns current project path"""
-        return self._current_project_path
-
-    def set_project_path(self, path: Path) -> None:
-        """Sets and validates project path"""
-        if not path.exists():
-            raise FileNotFoundError(f"Path does not exist: {path}")
-        if not path.is_dir():
-            raise NotADirectoryError(f"Path is not a directory: {path}")
-        self._current_project_path = path
 
     def set_dir(self, dir: str | Path = "."):
         """Sets OS directory"""
@@ -95,6 +83,11 @@ class OSManager:
         """Checks if current user has admin privileges"""
         return self._manager.is_admin()
 
+    def get_path_basename(self, path: str | Path) -> str:
+        """Get the basename (final component) of a path"""
+        path_obj = Path(path) if not isinstance(path, Path) else path
+        return path_obj.name
+
     def search_subfolders(
         self, validator: Callable, max_depth: int = 1, search_path=""
     ):
@@ -115,7 +108,7 @@ class OSManager:
                         return
                     result = validator(folder)
                     if result:
-                        results.append((folder.name, folder, result))
+                        results.append(Result(valid=result, object=folder))
 
                     if depth < max_depth:
                         recursion(folder, depth + 1)
@@ -127,89 +120,53 @@ class OSManager:
 
     def search_folder(self, validator: Callable, search_path=""):
         """Searches current folder using a validator function"""
+        # If not path given searches current folder
         if not search_path:
             search_path = self.get_dir()
 
-        search_path = Path(search_path)
+        search_path = Path(search_path)  # convert to path
 
         try:
             result = validator(search_path)
             if result:
-                return (search_path.name, search_path, result)
+                return Result(
+                    valid=result,
+                    object=search_path,
+                )
         except PermissionError:
             pass
 
         return None
 
-    def get_active_venv(self):
-        """Detects active virtual environment"""
-        import sys
-        import os
+    def get_environment_variable(self, var_name: str) -> str:
+        """Get an environment variable value"""
+        return os.environ.get(var_name)
 
-        # First check VIRTUAL_ENV environment variable
-        virtual_env = os.environ.get("VIRTUAL_ENV")
-        if not virtual_env:
-            return None
-
-        # If we have VIRTUAL_ENV, verify it with sys.prefix
-        if hasattr(sys, "real_prefix") or (
-            hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
-        ):
-            venv_path = virtual_env
-            venv_name = os.path.basename(venv_path)
-            return venv_name, venv_path
-
-        return None
-
-    def extract_requirements(self, venv_path: str | Path) -> Tuple[bool, str]:
-        """Extracts pip requirements from a virtual environment"""
-        import subprocess
-
-        venv_path = Path(venv_path)
+    def run_pip_command(self, venv_path: Path, pip_args: List[str]) -> Tuple[bool, str]:
+        """Run a pip command in a virtual environment"""
         pip_path = self._manager.get_pip_path(venv_path)
 
-        requirements_filename = "requirements.txt"
-        requirements_path = self.get_dir() / requirements_filename
-
         try:
-            # Run pip freeze to get requirements
             result = subprocess.run(
-                [str(pip_path), "freeze"], capture_output=True, text=True, check=True
+                [str(pip_path)] + pip_args, capture_output=True, text=True, check=True
             )
-
-            # Write requirements to file
-            requirements_path.write_text(result.stdout)
-            return requirements_filename, self.get_dir(), (requirements_filename, True)
+            return True, result.stdout
         except subprocess.CalledProcessError as e:
-            return False, f"Failed to run pip freeze: {e.stderr}"
+            return False, f"Failed to run pip command: {e.stderr}"
         except Exception as e:
-            return False, f"Error extracting requirements: {str(e)}"
+            return False, f"Error running pip command: {str(e)}"
 
-    def install_requirements(
-        self, venv_path: str | Path, requirements_path: str | Path
-    ) -> Tuple[bool, str]:
-        """Installs pip requirements into a virtual environment"""
-        venv_path = Path(venv_path)
-        requirements_path = Path(requirements_path)
-        pip_path = self._manager.get_pip_path(venv_path)
+    def check_file_exists(self, path: Path) -> bool:
+        """Check if a file exists"""
+        return path.exists() and path.is_file()
 
-        if not requirements_path.exists():
-            return False, f"Requirements file not found: {requirements_path}"
-
+    def write_text_file(self, path: Path, content: str) -> Tuple[bool, str]:
+        """Write text content to a file"""
         try:
-            # Run pip install with requirements file
-            result = subprocess.run(
-                [str(pip_path), "install", "-r", str(requirements_path)],
-                capture_output=True,
-                text=True,
-                check=True,
-            )
-
-            return True, "Requirements installed successfully"
-        except subprocess.CalledProcessError as e:
-            return False, f"Failed to install requirements: {e.stderr}"
+            path.write_text(content)
+            return True, "File written successfully"
         except Exception as e:
-            return False, f"Error installing requirements: {str(e)}"
+            return False, f"Error writing file: {str(e)}"
 
     def check_python_package_installed(
         self, venv_path: str | Path, package_name: str
@@ -278,3 +235,6 @@ class OSManager:
                 return False, f"Error installing {package}: {str(e)}"
 
         return True, "PostgreSQL dependencies were successfully installed"
+
+    def is_venv_directory(self, path: Path) -> bool:
+        self._manager.is_venv_directory(path)

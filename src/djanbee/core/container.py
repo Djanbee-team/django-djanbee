@@ -18,11 +18,12 @@ class AppContainer:
     def get_instance(cls) -> "AppContainer":
         if cls._instance is None:
             os_manager = OSManager()
+            console_manager = ConsoleManager()
 
             cls._instance = cls(
                 os_manager=os_manager,
-                django_manager=DjangoManager(os_manager),
-                console_manager=ConsoleManager(),
+                console_manager=console_manager,
+                django_manager=DjangoManager(os_manager, console_manager),
                 database_manager=DatabaseManager(os_manager),
             )
         return cls._instance
