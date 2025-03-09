@@ -1,49 +1,30 @@
 from pathlib import Path
-from .os_manager import OSManager
+from ....managers.os_manager import OSManager
+from ..state import DjangoManagerState
+import sys
+from collections import namedtuple
 import re
-from typing import Tuple
+from .settings_service_display import DjangoSettingsServiceDisplay
+
+Result = namedtuple("Result", ["valid", "object"])
 
 
-class DjangoManager:
-    def __init__(self, os_manager: OSManager):
+class DjangoSettingsService:
+    """Service for managing virtual environment"""
+
+    def __init__(self, os_manager: OSManager, display: DjangoSettingsServiceDisplay):
         self.os_manager = os_manager
-        self._current_project_path = None
+        self.state = DjangoManagerState.get_instance()
+        self.display = display
 
-    @property
-    def current_project_path(self):
-        return self._current_project_path
-
-    @current_project_path.setter
-    def current_project_path(self, path):
-        """Set the current Django project path"""
-        if path is not None and not isinstance(path, Path):
-            path = Path(path)
-        self._current_project_path = path
-
-    def find_django_project_in_current_dir(self) -> bool:
-        """Check if current directory contains a Django project"""
-        return self.os_manager.search_folder(self.is_django_project)
-
-    def find_django_projects_in_tree(self):
-        """Search for Django projects in subdirectories"""
-        return self.os_manager.search_subfolders(self.is_django_project)
-
-    @staticmethod
-    def is_django_project(path: Path) -> bool:
-        """Validate if directory is a Django project"""
-        required_files = ["manage.py"]
-        optional_files = ["requirements.txt", "Pipfile"]
-
-        if not path.is_dir():
-            return False
-
-        has_manage_py = any(file.name == "manage.py" for file in path.iterdir())
-
-        if not has_manage_py:
-            return False
-
-        manage_content = path.joinpath("manage.py").read_text()
-        return "django" in manage_content.lower()
+    def find_settings(self):
+        self.display.print_lookup_settings()
+        settings_file = self.find_settings_file()
+        if not settings_file:
+            self.display.error_found_settings()
+            return None
+        self.display.success_found_settings(settings_file)
+        return (True, settings_file)
 
     def find_settings_file(self) -> Path:
         """Find the settings.py file in the Django project
@@ -51,28 +32,30 @@ class DjangoManager:
         Returns:
             Path: Path to the settings.py file or None if not found
         """
-        if not self.current_project_path:
+        if not self.state.current_project_path:
             return None
 
         # Common patterns for settings file locations
         possible_locations = [
             # Standard Django project structure
-            self.current_project_path / self.current_project_path.name / "settings.py",
+            self.state.current_project_path
+            / self.state.current_project_path.name
+            / "settings.py",
             # Another common pattern (project/settings.py)
-            self.current_project_path / "settings.py",
+            self.state.current_project_path / "settings.py",
             # Project with config directory
-            self.current_project_path / "config" / "settings.py",
+            self.state.current_project_path / "config" / "settings.py",
             # Multiple settings files pattern
-            self.current_project_path
-            / self.current_project_path.name
+            self.state.current_project_path
+            / self.state.current_project_path.name
             / "settings"
             / "base.py",
-            self.current_project_path / "settings" / "base.py",
-            self.current_project_path / "config" / "settings" / "base.py",
+            self.state.current_project_path / "settings" / "base.py",
+            self.state.current_project_path / "config" / "settings" / "base.py",
         ]
 
         # Check for settings module indicated in manage.py
-        manage_path = self.current_project_path / "manage.py"
+        manage_path = self.state.current_project_path / "manage.py"
         if manage_path.exists():
             content = manage_path.read_text()
             # Look for DJANGO_SETTINGS_MODULE pattern
@@ -85,7 +68,7 @@ class DjangoManager:
                 module_path = settings_module_match.group(1)
                 # Convert module path (e.g. 'myproject.settings') to file path
                 parts = module_path.split(".")
-                file_path = self.current_project_path
+                file_path = self.state.current_project_path
                 for part in parts[
                     :-1
                 ]:  # All except the last part (which is the filename)
@@ -96,31 +79,15 @@ class DjangoManager:
         # Check each location
         for location in possible_locations:
             if location.exists() and location.is_file():
+                self.state.settings_path = location
                 return location
 
         # Search recursively as a fallback
-        for path in self.current_project_path.rglob("settings.py"):
+        for path in self.state.current_project_path.rglob("settings.py"):
+            self.state.settings_path = path
             return path
 
         return None
-
-    def generate_secret_key(self) -> str:
-        """
-        Generate a new Django-compatible secret key without depending on Django
-
-        Returns:
-            str: A new secure secret key suitable for Django
-        """
-        import secrets
-        import string
-
-        # Characters to use in the secret key - matching Django's pattern
-        chars = string.ascii_letters + string.digits + "!@#$%^&*(-_=+)"
-
-        # Generate a 50-character random string
-        secret_key = "".join(secrets.choice(chars) for _ in range(50))
-
-        return secret_key
 
     def find_in_settings(self, setting_name, default=None):
         """
@@ -133,10 +100,11 @@ class DjangoManager:
         Returns:
             The value of the setting if found, or the default value if not found
         """
-        settings_path = self.find_settings_file()
-        if not settings_path or not settings_path.exists():
+        if not self.state.settings_path:
+            self.state.settings_path = self.find_settings_file()
+        settings_path = self.state.settings_path
+        if not self.state.settings_path or not self.state.settings_path.exists():
             return default
-
         # Create a temporary module to execute the settings file
         import importlib.util
         import sys
@@ -171,28 +139,6 @@ class DjangoManager:
             if temp_module_name in sys.modules:
                 del sys.modules[temp_module_name]
 
-    def _parse_setting_value(self, value_str):
-        """
-        Parse a setting value string into the appropriate Python type
-
-        Args:
-            value_str (str): The string representation of the setting value
-
-        Returns:
-            The parsed value as the appropriate Python type
-        """
-        import ast
-
-        # Remove trailing commas that might cause ast.literal_eval to fail
-        value_str = value_str.rstrip(",")
-
-        try:
-            # Try to evaluate as a literal (handles strings, numbers, lists, tuples, dicts, etc.)
-            return ast.literal_eval(value_str)
-        except (SyntaxError, ValueError):
-            # If it can't be parsed as a literal, return it as is
-            return value_str
-
     def edit_settings(self, setting_name, new_value):
         """
         Update a specific setting in the Django settings file
@@ -204,12 +150,12 @@ class DjangoManager:
         Returns:
             bool: True if the setting was successfully updated, False otherwise
         """
-        import ast
 
-        settings_path = self.find_settings_file()
-        if not settings_path or not settings_path.exists():
+        if not self.state.settings_path:
+            self.state.settings_path = self.find_settings_file()
+        settings_path = self.state.settings_path
+        if not self.state.settings_path or not self.state.settings_path.exists():
             return False
-
         # Read the current content
         content = settings_path.read_text()
 
@@ -268,190 +214,6 @@ class DjangoManager:
             return True
 
         return False
-
-    def edit_database_settings(self, new_databases):
-        """
-        Update the DATABASES setting in the Django settings file
-
-        Args:
-            new_databases (dict): The new DATABASES configuration
-
-        Returns:
-            tuple: (bool success, str message)
-        """
-        # Validate that a default database is present
-        if "default" not in new_databases:
-            return False, "Error: The 'default' database configuration is required"
-
-        settings_path = self.find_settings_file()
-        if not settings_path or not settings_path.exists():
-            return False, "Error: Settings file not found"
-
-        # Read the current content
-        content = settings_path.read_text()
-
-        # Format the new databases dictionary with proper indentation
-        from pprint import pformat
-
-        formatted_databases = pformat(new_databases, indent=4)
-
-        # Find the DATABASES definition in the file
-        import re
-
-        # First look for the start of the DATABASES assignment
-        start_match = re.search(r"DATABASES\s*=\s*{", content)
-        if not start_match:
-            # DATABASES not found, append it to the end of the file
-            new_content = f"{content}\n\n# Added by Django Manager\nDATABASES = {formatted_databases}\n"
-            settings_path.write_text(new_content)
-            return True, "DATABASES setting added successfully"
-
-        # Find the entire DATABASES block by tracking braces
-        start_pos = start_match.start()
-        brace_count = 0
-        end_pos = -1
-
-        # Skip to the first opening brace
-        first_brace_pos = content.find("{", start_pos)
-        if first_brace_pos == -1:
-            return False, "Error: Malformed DATABASES setting"
-
-        # Count braces to find the matching closing brace
-        for i in range(first_brace_pos, len(content)):
-            char = content[i]
-            if char == "{":
-                brace_count += 1
-            elif char == "}":
-                brace_count -= 1
-                if brace_count == 0:
-                    end_pos = i + 1
-                    break
-
-        if end_pos == -1:
-            return False, "Error: Could not find the end of DATABASES definition"
-
-        # Replace the entire DATABASES block with the new configuration
-        new_content = (
-            content[:start_pos]
-            + f"DATABASES = {str(formatted_databases)}"
-            + content[end_pos:]
-        )
-
-        # Write the updated content back to the file
-        settings_path.write_text(new_content)
-        return True, "DATABASES setting updated successfully"
-
-    def check_whitenoise_installed(self, venv_path: str | Path) -> Tuple[bool, str]:
-        """
-        Check if WhiteNoise is installed in the virtual environment.
-
-        Args:
-            venv_path: Path to the virtual environment
-
-        Returns:
-            Tuple of (is_installed: bool, message: str)
-        """
-        is_installed, message = self.os_manager.check_python_package_installed(
-            venv_path, "whitenoise"
-        )
-
-        return is_installed, message
-
-    def install_whitenoise(self, venv_path: str | Path) -> Tuple[bool, str]:
-        """
-        Install WhiteNoise in the virtual environment if not already installed.
-
-        Args:
-            venv_path: Path to the virtual environment
-
-        Returns:
-            Tuple of (success: bool, message: str)
-        """
-        # Check if already installed
-        is_installed, _ = self.check_whitenoise_installed(venv_path)
-        if is_installed:
-            return True, "WhiteNoise is already installed"
-
-        # Install WhiteNoise
-        pip_path = self.os_manager._manager.get_pip_path(Path(venv_path))
-        try:
-            result = self.os_manager.run_command(
-                [str(pip_path), "install", "whitenoise"]
-            )
-            if result[0]:
-                return True, "WhiteNoise installed successfully"
-            else:
-                return False, f"Failed to install WhiteNoise: {result[1]}"
-        except Exception as e:
-            return False, f"Error installing WhiteNoise: {str(e)}"
-
-    def edit_middleware_settings(self, new_middleware):
-        """
-        Update the MIDDLEWARE setting in the Django settings file
-
-        Args:
-            new_middleware (list): The new MIDDLEWARE configuration
-
-        Returns:
-            tuple: (bool success, str message)
-        """
-        settings_path = self.find_settings_file()
-        if not settings_path or not settings_path.exists():
-            return False, "Error: Settings file not found"
-
-        # Read the current content
-        content = settings_path.read_text()
-
-        # Format the new middleware list with proper indentation
-        from pprint import pformat
-
-        formatted_middleware = pformat(new_middleware, indent=4)
-
-        # Find the MIDDLEWARE definition in the file
-        import re
-
-        # First look for the start of the MIDDLEWARE assignment
-        start_match = re.search(r"MIDDLEWARE\s*=\s*\[", content)
-        if not start_match:
-            # MIDDLEWARE not found, append it to the end of the file
-            new_content = f"{content}\n\n# Added by Django Manager\nMIDDLEWARE = {formatted_middleware}\n"
-            settings_path.write_text(new_content)
-            return True, "MIDDLEWARE setting added successfully"
-
-        # Find the entire MIDDLEWARE block by tracking brackets
-        start_pos = start_match.start()
-        bracket_count = 0
-        end_pos = -1
-
-        # Skip to the first opening bracket
-        first_bracket_pos = content.find("[", start_pos)
-        if first_bracket_pos == -1:
-            return False, "Error: Malformed MIDDLEWARE setting"
-
-        # Count brackets to find the matching closing bracket
-        for i in range(first_bracket_pos, len(content)):
-            char = content[i]
-            if char == "[":
-                bracket_count += 1
-            elif char == "]":
-                bracket_count -= 1
-                if bracket_count == 0:
-                    end_pos = i + 1
-                    break
-
-        if end_pos == -1:
-            return False, "Error: Could not find the end of MIDDLEWARE definition"
-
-        # Replace the entire MIDDLEWARE block with the new configuration
-        new_content = (
-            content[:start_pos]
-            + f"MIDDLEWARE = {str(formatted_middleware)}"
-            + content[end_pos:]
-        )
-
-        # Write the updated content back to the file
-        settings_path.write_text(new_content)
-        return True, "MIDDLEWARE setting updated successfully"
 
     def replace_settings(self, setting_name, new_value_raw):
         """
@@ -604,66 +366,70 @@ class DjangoManager:
         except Exception as e:
             return False, f"Error adding library import: {str(e)}"
 
-    def get_raw_staticfiles_dirs(self):
+    def edit_middleware_settings(self, new_middleware):
         """
-        Get the raw STATICFILES_DIRS expressions from the settings file,
-        correctly handling nested parentheses.
+        Update the MIDDLEWARE setting in the Django settings file
+
+        Args:
+            new_middleware (list): The new MIDDLEWARE configuration
 
         Returns:
-            list: List of raw expressions in the STATICFILES_DIRS setting,
-                or empty list if the setting doesn't exist
+            tuple: (bool success, str message)
         """
         settings_path = self.find_settings_file()
-        if not settings_path:
-            return []
+        if not settings_path or not settings_path.exists():
+            return False, "Error: Settings file not found"
 
-        try:
-            content = settings_path.read_text()
+        # Read the current content
+        content = settings_path.read_text()
 
-            # Find the STATICFILES_DIRS declaration
-            import re
+        # Format the new middleware list with proper indentation
+        from pprint import pformat
 
-            pattern = r"STATICFILES_DIRS\s*=\s*\[(.*?)\]"
-            match = re.search(pattern, content, re.DOTALL)
+        formatted_middleware = pformat(new_middleware, indent=4)
 
-            if not match:
-                return []
+        # Find the MIDDLEWARE definition in the file
+        import re
 
-            # Get the content inside the brackets
-            raw_content = match.group(1).strip()
+        # First look for the start of the MIDDLEWARE assignment
+        start_match = re.search(r"MIDDLEWARE\s*=\s*\[", content)
+        if not start_match:
+            # MIDDLEWARE not found, append it to the end of the file
+            new_content = f"{content}\n\n# Added by Django Manager\nMIDDLEWARE = {formatted_middleware}\n"
+            settings_path.write_text(new_content)
+            return True, "MIDDLEWARE setting added successfully"
 
-            if not raw_content:
-                return []
+        # Find the entire MIDDLEWARE block by tracking brackets
+        start_pos = start_match.start()
+        bracket_count = 0
+        end_pos = -1
 
-            # Split by commas, respecting nested parentheses and brackets
-            expressions = []
-            current_expr = ""
-            paren_level = 0
-            bracket_level = 0
+        # Skip to the first opening bracket
+        first_bracket_pos = content.find("[", start_pos)
+        if first_bracket_pos == -1:
+            return False, "Error: Malformed MIDDLEWARE setting"
 
-            for char in raw_content:
-                if char == "," and paren_level == 0 and bracket_level == 0:
-                    # Only split on commas at the top level
-                    if current_expr.strip():
-                        expressions.append(current_expr.strip())
-                    current_expr = ""
-                else:
-                    current_expr += char
-                    if char == "(":
-                        paren_level += 1
-                    elif char == ")":
-                        paren_level -= 1
-                    elif char == "[":
-                        bracket_level += 1
-                    elif char == "]":
-                        bracket_level -= 1
+        # Count brackets to find the matching closing bracket
+        for i in range(first_bracket_pos, len(content)):
+            char = content[i]
+            if char == "[":
+                bracket_count += 1
+            elif char == "]":
+                bracket_count -= 1
+                if bracket_count == 0:
+                    end_pos = i + 1
+                    break
 
-            # Add the last expression if there is one
-            if current_expr.strip():
-                expressions.append(current_expr.strip())
+        if end_pos == -1:
+            return False, "Error: Could not find the end of MIDDLEWARE definition"
 
-            return expressions
+        # Replace the entire MIDDLEWARE block with the new configuration
+        new_content = (
+            content[:start_pos]
+            + f"MIDDLEWARE = {str(formatted_middleware)}"
+            + content[end_pos:]
+        )
 
-        except Exception as e:
-            print(f"Error getting raw STATICFILES_DIRS: {e}")
-            return []
+        # Write the updated content back to the file
+        settings_path.write_text(new_content)
+        return True, "MIDDLEWARE setting updated successfully"

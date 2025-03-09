@@ -136,3 +136,10 @@ class WindowsOSManager(BaseOSManager):
             return ctypes.windll.shell32.IsUserAnAdmin() != 0
         except Exception:
             return False
+
+    def is_venv_directory(self, path: Path) -> bool:
+        """Check if a directory is a virtual environment on Windows systems"""
+        cfg_exists = (path / "pyvenv.cfg").exists()
+        scripts_exists = (path / "Scripts").exists()
+        python_exists = (path / "Scripts" / "python.exe").exists()
+        return cfg_exists and scripts_exists and python_exists

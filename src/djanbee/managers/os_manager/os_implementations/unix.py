@@ -155,3 +155,10 @@ class UnixOSManager(BaseOSManager):
             return os.geteuid() == 0
         except Exception:
             return False
+
+    def is_venv_directory(self, path: Path) -> bool:
+        """Check if a directory is a virtual environment on Unix systems"""
+        cfg_exists = (path / "pyvenv.cfg").exists()
+        bin_exists = (path / "bin").exists()
+        python_exists = (path / "bin" / "python").exists()
+        return cfg_exists and bin_exists and python_exists
