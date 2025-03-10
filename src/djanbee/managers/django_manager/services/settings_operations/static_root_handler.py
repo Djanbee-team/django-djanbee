@@ -249,13 +249,12 @@ class StaticRootHandler:
             list: List of raw expressions in the STATICFILES_DIRS setting,
                 or empty list if the setting doesn't exist
         """
-        settings_path = self.settings_service.find_settings_file()
-        if not settings_path:
+        # Use the settings service to read the file
+        success, content, _ = self.settings_service._read_settings_file()
+        if not success:
             return []
 
         try:
-            content = settings_path.read_text()
-
             # Find the STATICFILES_DIRS declaration
             import re
 

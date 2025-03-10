@@ -1,7 +1,6 @@
 from pathlib import Path
 from ....managers.os_manager import OSManager
 from ..state import DjangoManagerState
-import sys
 from collections import namedtuple
 import re
 from .settings_service_display import DjangoSettingsServiceDisplay
@@ -10,7 +9,7 @@ Result = namedtuple("Result", ["valid", "object"])
 
 
 class DjangoSettingsService:
-    """Service for managing virtual environment"""
+    """Service for managing Django settings"""
 
     def __init__(self, os_manager: OSManager, display: DjangoSettingsServiceDisplay):
         self.os_manager = os_manager
@@ -25,6 +24,19 @@ class DjangoSettingsService:
             return None
         self.display.success_found_settings(settings_file)
         return (True, settings_file)
+
+    def get_settings_path(self):
+        """
+        Get the settings path, using cached value if available or finding it if not.
+        
+        Returns:
+            Path: Path to the settings.py file or None if not found
+        """
+        if self.state.settings_path and self.state.settings_path.exists():
+            return self.state.settings_path
+            
+        self.state.settings_path = self.find_settings_file()
+        return self.state.settings_path
 
     def find_settings_file(self) -> Path:
         """Find the settings.py file in the Django project
@@ -58,9 +70,8 @@ class DjangoSettingsService:
         manage_path = self.state.current_project_path / "manage.py"
         if manage_path.exists():
             content = manage_path.read_text()
+            
             # Look for DJANGO_SETTINGS_MODULE pattern
-            import re
-
             settings_module_match = re.search(
                 r'DJANGO_SETTINGS_MODULE["\']?\s*,\s*["\']([^"\']+)["\']', content
             )
@@ -89,6 +100,34 @@ class DjangoSettingsService:
 
         return None
 
+    def _read_settings_file(self):
+        """Utility method to read settings file content
+        
+        Returns:
+            tuple: (bool success, str content or error message, Path settings_path)
+        """
+        settings_path = self.get_settings_path()
+        if not settings_path or not settings_path.exists():
+            return False, "Settings file not found", None
+        
+        try:
+            content = settings_path.read_text()
+            return True, content, settings_path
+        except Exception as e:
+            return False, f"Error reading settings file: {str(e)}", None
+
+    def _write_settings_file(self, settings_path, content):
+        """Utility method to write settings file content
+        
+        Returns:
+            tuple: (bool success, str message)
+        """
+        try:
+            settings_path.write_text(content)
+            return True, "Settings updated successfully"
+        except Exception as e:
+            return False, f"Error writing settings file: {str(e)}"
+
     def find_in_settings(self, setting_name, default=None):
         """
         Find a specific setting in the Django settings file
@@ -100,11 +139,10 @@ class DjangoSettingsService:
         Returns:
             The value of the setting if found, or the default value if not found
         """
-        if not self.state.settings_path:
-            self.state.settings_path = self.find_settings_file()
-        settings_path = self.state.settings_path
-        if not self.state.settings_path or not self.state.settings_path.exists():
+        settings_path = self.get_settings_path()
+        if not settings_path:
             return default
+        
         # Create a temporary module to execute the settings file
         import importlib.util
         import sys
@@ -148,16 +186,12 @@ class DjangoSettingsService:
             new_value: The new value to set for the setting
 
         Returns:
-            bool: True if the setting was successfully updated, False otherwise
+            bool or tuple: True if the setting was successfully updated or (True, "success message"),
+                          False or (False, "error message") otherwise
         """
-
-        if not self.state.settings_path:
-            self.state.settings_path = self.find_settings_file()
-        settings_path = self.state.settings_path
-        if not self.state.settings_path or not self.state.settings_path.exists():
-            return False
-        # Read the current content
-        content = settings_path.read_text()
+        success, content, settings_path = self._read_settings_file()
+        if not success:
+            return False if isinstance(content, bool) else (False, content)
 
         # Prepare the string representation of the new value
         if isinstance(new_value, str):
@@ -210,8 +244,8 @@ class DjangoSettingsService:
 
         # Write the updated content back to the file
         if updated:
-            settings_path.write_text(new_content)
-            return True
+            success, message = self._write_settings_file(settings_path, new_content)
+            return success if isinstance(success, bool) else (success, message)
 
         return False
 
@@ -227,14 +261,11 @@ class DjangoSettingsService:
         Returns:
             tuple: (bool success, str message)
         """
-        settings_path = self.find_settings_file()
-        if not settings_path or not settings_path.exists():
-            return False, f"Error: Settings file not found at {settings_path}"
+        success, content, settings_path = self._read_settings_file()
+        if not success:
+            return False, content
 
         try:
-            # Read the current content
-            content = settings_path.read_text()
-
             # Pattern for finding the entire setting line or block
             pattern = rf"{setting_name}\s*=\s*[^\n]+"
 
@@ -243,13 +274,11 @@ class DjangoSettingsService:
                 new_content = re.sub(
                     pattern, f"{setting_name} = {new_value_raw}", content
                 )
-                settings_path.write_text(new_content)
-                return True, f"{setting_name} replaced successfully"
+                return self._write_settings_file(settings_path, new_content)
             else:
                 # Setting not found, append it to the end of the file
-                new_content = f"{content}\n\n# Added by Django Manager\n{setting_name} = {new_value_raw}\n"
-                settings_path.write_text(new_content)
-                return True, f"{setting_name} added successfully"
+                new_content = f"{content}\n\n# Added by Djanbee\n{setting_name} = {new_value_raw}\n"
+                return self._write_settings_file(settings_path, new_content)
 
         except Exception as e:
             return False, f"Error replacing setting {setting_name}: {str(e)}"
@@ -264,14 +293,11 @@ class DjangoSettingsService:
         Returns:
             bool: True if the library is imported, False otherwise
         """
-        settings_path = self.find_settings_file()
-        if not settings_path or not settings_path.exists():
+        success, content, _ = self._read_settings_file()
+        if not success:
             return False
 
         try:
-            # Read the content of the settings file
-            content = settings_path.read_text()
-
             # Define patterns for different import styles
             import_patterns = [
                 rf"import\s+{library_name}",  # import os
@@ -310,14 +336,11 @@ class DjangoSettingsService:
         if self.is_library_imported(library_name):
             return True, f"{library_name} is already imported"
 
-        settings_path = self.find_settings_file()
-        if not settings_path or not settings_path.exists():
-            return False, "Settings file not found"
+        success, content, settings_path = self._read_settings_file()
+        if not success:
+            return False, content
 
         try:
-            # Read the content of the settings file
-            content = settings_path.read_text()
-
             # Construct the import statement based on the parameters
             if import_from:
                 if import_what:
@@ -359,9 +382,7 @@ class DjangoSettingsService:
             new_content = "\n".join(new_lines)
 
             # Write the modified content back to the file
-            settings_path.write_text(new_content)
-
-            return True, f"Added import for {library_name}"
+            return self._write_settings_file(settings_path, new_content)
 
         except Exception as e:
             return False, f"Error adding library import: {str(e)}"
@@ -376,28 +397,28 @@ class DjangoSettingsService:
         Returns:
             tuple: (bool success, str message)
         """
-        settings_path = self.find_settings_file()
-        if not settings_path or not settings_path.exists():
-            return False, "Error: Settings file not found"
-
-        # Read the current content
-        content = settings_path.read_text()
-
-        # Format the new middleware list with proper indentation
         from pprint import pformat
-
         formatted_middleware = pformat(new_middleware, indent=4)
-
-        # Find the MIDDLEWARE definition in the file
-        import re
+        
+        # Try simple setting first 
+        result = self.edit_settings("MIDDLEWARE", new_middleware)
+        # If result is a tuple, unpack it
+        success = result[0] if isinstance(result, tuple) else result
+        
+        if success:
+            return True, "MIDDLEWARE setting updated successfully"
+        
+        # If simple edit fails, use more complex approach to handle list brackets
+        success, content, settings_path = self._read_settings_file()
+        if not success:
+            return False, content
 
         # First look for the start of the MIDDLEWARE assignment
         start_match = re.search(r"MIDDLEWARE\s*=\s*\[", content)
         if not start_match:
             # MIDDLEWARE not found, append it to the end of the file
             new_content = f"{content}\n\n# Added by Django Manager\nMIDDLEWARE = {formatted_middleware}\n"
-            settings_path.write_text(new_content)
-            return True, "MIDDLEWARE setting added successfully"
+            return self._write_settings_file(settings_path, new_content)
 
         # Find the entire MIDDLEWARE block by tracking brackets
         start_pos = start_match.start()
@@ -431,5 +452,4 @@ class DjangoSettingsService:
         )
 
         # Write the updated content back to the file
-        settings_path.write_text(new_content)
-        return True, "MIDDLEWARE setting updated successfully"
+        return self._write_settings_file(settings_path, new_content)
