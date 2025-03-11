@@ -38,7 +38,7 @@ class ConfigureSettingsManager:
             "Manage ALLOWED_HOSTS": self.app.django_manager.allowed_hosts_handler.handle_allowed_hosts,
             "Manage databases": self.app.django_manager.databases_handler.handle_databases,
             "Set up STATIC_ROOT": self.app.django_manager.static_root_handler.handle_static_root,
-            # "Enable SSL settings (does not generate a certificate)": self._handle_ssl,
+            "Enable SSL settings (does not generate a certificate)": self.app.django_manager.ssl_handler.handle_ssl,
             # "Disable DEBUG": self._handle_debug,
         }
 

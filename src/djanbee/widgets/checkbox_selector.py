@@ -6,13 +6,17 @@ from ..managers import ConsoleManager
 
 class CheckboxSelector:
     def __init__(
-        self, message: str, options: List[str], console_manager: ConsoleManager
+        self, message: str, options: List[str], console_manager: ConsoleManager, pre_selected: Optional[List[str]] = None
     ):
         self.cursor_index = 0
         self.selected_indices = set()
         self.console_manager = console_manager
         self.message = message
         self.options = options
+        
+        if pre_selected:
+            self._set_pre_selected(pre_selected)
+
 
     def prepare_message(self):
         """Print question message in blue with checkbox emoji and border"""
@@ -21,6 +25,18 @@ class CheckboxSelector:
         text.append(self.message, style="blue")
         text.append("\n")
         return text
+
+    def _set_pre_selected(self, pre_selected: List[str]):
+        """
+        Set pre-selected options by matching option strings
+        
+        Args:
+            pre_selected: List of option strings that should be pre-selected
+        """
+        # Find indices of pre-selected options
+        for option in pre_selected:
+            if option in self.options:
+                self.selected_indices.add(self.options.index(option))
 
     def _render_options(self):
         """Render the checkbox selection options."""
@@ -123,4 +139,4 @@ class CheckboxSelector:
 
             # Ctrl+C to cancel
             elif key == "\x03":
-                return []
+                return None

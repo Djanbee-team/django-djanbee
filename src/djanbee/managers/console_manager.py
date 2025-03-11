@@ -113,6 +113,13 @@ class ConsoleManager:
         except Exception as e:
             self.print_error(str(e))
             return self.input_password()
+    
+    def print_info(self, message):
+        text = Text()
+        text.append("ℹ️  ", style="")  
+        text.append(message, style="blue")
+        self.console.print(text)
+
 
 
 
