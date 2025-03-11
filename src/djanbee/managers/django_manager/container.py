@@ -26,6 +26,8 @@ from .services.settings_operations.static_files import (
     StaticRootHandlerDisplay,
 )
 
+from .services.settings_operations.ssl import (SslHandler, SslHandlerDisplay)
+
 
 class DjangoManager:
     """Container for Django-related services with lazy loading"""
@@ -45,6 +47,7 @@ class DjangoManager:
         self._allowed_hosts_handler = None
         self._databases_handler = None
         self._static_root_handler = None
+        self._ssl_handler = None
 
         # Cache values
         self._current_project_path = None
@@ -122,3 +125,13 @@ class DjangoManager:
                 self.environment_service,
             )
         return self._static_root_handler
+
+    @property
+    def ssl_handler(self):
+        if self._ssl_handler is None:
+            self._ssl_handler = SslHandler(
+                self.settings_service,
+                SslHandlerDisplay(self.console_manager),
+            )
+        return self._ssl_handler
+

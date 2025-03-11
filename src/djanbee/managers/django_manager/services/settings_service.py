@@ -453,3 +453,74 @@ class DjangoSettingsService:
 
         # Write the updated content back to the file
         return self._write_settings_file(settings_path, new_content)
+    
+
+    def delete_setting(self, setting_name):
+        """
+        Delete a setting from the Django settings file, including associated comments
+        and empty lines.
+        
+        Args:
+            setting_name (str): The name of the setting to delete
+            
+        Returns:
+            tuple: (bool success, str message)
+        """
+        success, content, settings_path = self._read_settings_file()
+        if not success:
+            return False, content
+        
+        # Split content into lines for more precise handling
+        lines = content.split('\n')
+        new_lines = []
+        
+        # Variables to track state
+        setting_found = False
+        skip_next_empty = False
+        i = 0
+        
+        while i < len(lines):
+            line = lines[i]
+            
+            # Check if this line contains the setting
+            if re.match(rf"\s*{setting_name}\s*=", line):
+                setting_found = True
+                skip_next_empty = True
+                
+                # Look backward for comments and empty lines
+                j = len(new_lines) - 1
+                
+                # Skip immediately preceding empty lines
+                while j >= 0 and new_lines[j].strip() == '':
+                    j -= 1
+                
+                # Skip immediately preceding comments (especially those added by Django Manager)
+                while j >= 0 and new_lines[j].strip().startswith('#'):
+                    j -= 1
+                
+                # Keep only lines up to j
+                new_lines = new_lines[:j+1]
+                
+                # Skip this line (the setting line)
+                i += 1
+                continue
+            
+            # Skip empty line after setting if needed
+            if skip_next_empty and line.strip() == '':
+                skip_next_empty = False
+                i += 1
+                continue
+            
+            # Keep all other lines
+            new_lines.append(line)
+            i += 1
+        
+        if not setting_found:
+            return True, f"Setting {setting_name} not found, nothing to delete"
+        
+        try:
+            # Join lines back into content and write to file
+            new_content = '\n'.join(new_lines)
+            return self._write_settings_file(settings_path, new_content)
+        except Exception as e:
+            return False, f"Error deleting setting {setting_name}: {str(e)}"
