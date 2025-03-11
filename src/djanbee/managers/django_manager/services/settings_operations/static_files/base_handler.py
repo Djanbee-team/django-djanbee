@@ -39,7 +39,6 @@ class StaticFilesHandler(ABC):
             bool: True if successful, False otherwise
         """
         static_url = self.settings_service.find_in_settings("STATIC_URL")
-        print(static_url, url)
         if static_url != url:
             self.display.print_progress_static_url()
             result = self.settings_service.edit_settings("STATIC_URL", url)

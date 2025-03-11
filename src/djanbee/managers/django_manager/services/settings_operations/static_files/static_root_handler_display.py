@@ -93,4 +93,18 @@ class StaticRootHandlerDisplay:
 
         return url
 
+    def print_progress_media_root(self):
+        self.console_manager.print_progress("Setting MEDIA_ROOT")
+    
+    def print_progress_media_url(self):
+        self.console_manager.print_progress("Setting MEDIA_URL")
+    
+    def print_progress_media_root_add_os(self):
+        self.console_manager.print_progress("Importing os library for MEDIA_ROOT")
+    
+    def success_progress_media_settings(self, media_url, media_root):
+        self.console_manager.print_step_progress("MEDIA_URL", media_url)
+        self.console_manager.print_step_progress("MEDIA_ROOT", media_root)
+
+
 

@@ -19,7 +19,6 @@ class NginxHandler(StaticFilesHandler):
         """
         # Configure basic static file settings using parent class methods
         static_url = self.settings_service.find_in_settings("STATIC_URL", default="")
-        print(static_url)
         new_url = self.display.input_static_url(static_url)
         
         if new_url is None:
@@ -37,10 +36,7 @@ class NginxHandler(StaticFilesHandler):
         # Configure media settings if needed
         if not self.setup_media_settings():
             return False
-        
-        # Provide guidance on Nginx configuration
-        self.display_nginx_configuration_instructions()
-        
+                
         return True
 
     def setup_media_settings(self) -> bool:
@@ -77,83 +73,6 @@ class NginxHandler(StaticFilesHandler):
             if not result[0]:
                 return False
         
-        self.display.success_progress_media_settings()
+        self.display.success_progress_media_settings("/media/", "os.path.join(BASE_DIR, 'media')")
         return True
 
-    def display_nginx_configuration_instructions(self) -> None:
-        """Display instructions for configuring Nginx to serve static files"""
-        static_url = cast(str, self.settings_service.find_in_settings("STATIC_URL", "/static/"))
-        static_root = cast(str, self.settings_service.find_in_settings("STATIC_ROOT", "staticfiles"))
-        media_url = cast(str, self.settings_service.find_in_settings("MEDIA_URL", "/media/"))
-        media_root = cast(str, self.settings_service.find_in_settings("MEDIA_ROOT", "media"))
-        
-        self.display.print_nginx_instructions(
-            static_url=static_url,
-            static_root=static_root,
-            media_url=media_url,
-            media_root=media_root
-        )
-
-    def generate_nginx_config(self, server_name: str, 
-                             static_url: str = "/static/", 
-                             media_url: str = "/media/") -> str:
-        """
-        Generate a sample Nginx configuration for the Django project
-        
-        Args:
-            server_name: The server name (domain) for the Nginx configuration
-            static_url: The URL path for static files (from STATIC_URL)
-            media_url: The URL path for media files (from MEDIA_URL)
-            
-        Returns:
-            str: A sample Nginx configuration
-        """
-        # Get project settings to generate accurate paths
-        static_root = self.settings_service.find_in_settings("STATIC_ROOT", "staticfiles")
-        media_root = self.settings_service.find_in_settings("MEDIA_ROOT", "media")
-        
-        # Convert OS path join expressions to actual paths if needed
-        static_root_path = "staticfiles"  # Default fallback
-        if isinstance(static_root, str):
-            if "os.path.join" in static_root:
-                # Extract just the last part from the os.path.join expression
-                import re
-                match = re.search(r"'([^']+)'(?:\s*\))?$", static_root)
-                if match:
-                    static_root_path = match.group(1)
-            else:
-                static_root_path = static_root
-        
-        media_root_path = "media"  # Default fallback
-        if isinstance(media_root, str):
-            if "os.path.join" in media_root:
-                # Extract just the last part from the os.path.join expression
-                import re
-                match = re.search(r"'([^']+)'(?:\s*\))?$", media_root)
-                if match:
-                    media_root_path = match.group(1)
-            else:
-                media_root_path = media_root
-        
-        # Generate the configuration
-        nginx_config = f"""
-server {{
-    listen 80;
-    server_name {server_name};
-
-    location {static_url} {{
-        alias /path/to/your/project/{static_root_path}/;
-    }}
-
-    location {media_url} {{
-        alias /path/to/your/project/{media_root_path}/;
-    }}
-
-    location / {{
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }}
-}}
-"""
-        return nginx_config
