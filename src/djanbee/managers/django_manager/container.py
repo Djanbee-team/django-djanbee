@@ -21,7 +21,7 @@ from .services.settings_operations.databases_handler import (
     DatabasesHandler,
     DatabasesHandlerDisplay,
 )
-from .services.settings_operations.static_root_handler import (
+from .services.settings_operations.static_files import (
     StaticRootHandler,
     StaticRootHandlerDisplay,
 )

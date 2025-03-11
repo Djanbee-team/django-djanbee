@@ -37,7 +37,7 @@ class ConfigureSettingsManager:
             "Generate secret key": self._handle_secret_key,
             "Manage ALLOWED_HOSTS": self.app.django_manager.allowed_hosts_handler.handle_allowed_hosts,
             "Manage databases": self.app.django_manager.databases_handler.handle_databases,
-            "Set up STATIC_ROOT": self.app.django_manager.static_root_handler._handle_static_root,
+            "Set up STATIC_ROOT": self.app.django_manager.static_root_handler.handle_static_root,
             # "Enable SSL settings (does not generate a certificate)": self._handle_ssl,
             # "Disable DEBUG": self._handle_debug,
         }
@@ -49,3 +49,4 @@ class ConfigureSettingsManager:
         """Handle generating and setting a new secret key"""
         secret_key = self.app.django_manager.secret_key_handler.create_secret_key()
         self.app.django_manager.secret_key_handler.update_secret_key(secret_key)
+        
