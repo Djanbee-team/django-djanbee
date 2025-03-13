@@ -13,10 +13,13 @@ class ConfigureSettingsDisplay:
             "Manage databases",
             "Set up STATIC_ROOT",
             "Enable SSL settings (does not generate a certificate)",
-            "Disable DEBUG",
+            "Disable/Enable DEBUG",
         ]
 
         result = CheckboxSelector(
             "Select settings to configure:", options, self.console_manager
         )
         return result.select()
+
+    def success_settings_configure(self):
+        self.console_manager.print_success("Settings successfully configured")

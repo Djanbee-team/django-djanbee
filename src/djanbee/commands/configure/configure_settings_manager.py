@@ -39,14 +39,15 @@ class ConfigureSettingsManager:
             "Manage databases": self.app.django_manager.databases_handler.handle_databases,
             "Set up STATIC_ROOT": self.app.django_manager.static_root_handler.handle_static_root,
             "Enable SSL settings (does not generate a certificate)": self.app.django_manager.ssl_handler.handle_ssl,
-            # "Disable DEBUG": self._handle_debug,
+            "Disable/Enable DEBUG": self.app.django_manager.debug_handler.handle_debug,
         }
 
         if setting in handlers:
             handlers[setting]()
 
+        self.display.success_settings_configure()
+
     def _handle_secret_key(self):
         """Handle generating and setting a new secret key"""
         secret_key = self.app.django_manager.secret_key_handler.create_secret_key()
         self.app.django_manager.secret_key_handler.update_secret_key(secret_key)
-        

@@ -26,7 +26,9 @@ from .services.settings_operations.static_files import (
     StaticRootHandlerDisplay,
 )
 
-from .services.settings_operations.ssl import (SslHandler, SslHandlerDisplay)
+from .services.settings_operations.ssl import SslHandler, SslHandlerDisplay
+from .services.settings_operations.debug_handler import DebugHandler
+from .services.settings_operations.debug_handler_display import DebugHandlerDisplay
 
 
 class DjangoManager:
@@ -48,6 +50,7 @@ class DjangoManager:
         self._databases_handler = None
         self._static_root_handler = None
         self._ssl_handler = None
+        self._debug_handler = None
 
         # Cache values
         self._current_project_path = None
@@ -135,3 +138,11 @@ class DjangoManager:
             )
         return self._ssl_handler
 
+    @property
+    def debug_handler(self):
+        if self._debug_handler is None:
+            self._debug_handler = DebugHandler(
+                self.settings_service,
+                DebugHandlerDisplay(self.console_manager),
+            )
+        return self._debug_handler
