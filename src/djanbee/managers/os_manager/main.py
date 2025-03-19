@@ -43,6 +43,12 @@ class OSManager:
         """Gets platform-specific pip executable path"""
         return self._manager.get_pip_path(venv_path)
 
+    def check_pip_package_installed(self, package_name: str) -> bool:
+        return self._manager.check_pip_package_installed(package_name)
+
+    def install_pip_package(self, package_name: str) -> Tuple[bool, str]:
+        return self._manager.install_pip_package(package_name)
+
     def check_package_installed(self, package_name: str) -> bool:
         """Checks if a system package is installed"""
         return self._manager.check_package_installed(package_name)

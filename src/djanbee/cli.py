@@ -1,5 +1,10 @@
 import click
-from .commands import LaunchContainer, SetupContainer, ConfigureContainer
+from .commands import (
+    LaunchContainer,
+    SetupContainer,
+    ConfigureContainer,
+    DeployContainer,
+)
 from .core import AppContainer
 
 
@@ -44,6 +49,17 @@ def configure(database: bool, settings: bool, path: str):
         container = ConfigureContainer.create(app)
 
         container.configure_project(database=database, settings=settings)
+    except Exception as e:
+        print(f"Error {e}")
+
+
+@cli.command()
+def deploy():
+    try:
+        app = AppContainer.get_instance()
+        container = DeployContainer.create(app)
+
+        container.verify_packages()
     except Exception as e:
         print(f"Error {e}")
 
