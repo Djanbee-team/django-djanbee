@@ -1,4 +1,5 @@
 from ...managers import ConsoleManager
+from ...widgets.question_selector import QuestionSelector
 
 
 class DeployDisplay:
@@ -35,3 +36,19 @@ class DeployDisplay:
 
     def success_verify_dep(self):
         self.console_manager.print_success("Server dependencies verified successfully!")
+
+    def failure_verify_venv(self):
+        self.console_manager.print_warning_critical("No venv found")
+
+    def prompt_override_socket(self, service_path, service_name):
+        selector = QuestionSelector(
+            "Do you wish to override socketfile",
+            self.console_manager,
+            "yes",
+            "no",
+            f"This action will replace the current {service_name}",
+        )
+        return selector.select()
+
+    def success_create_socketservice(self, path):
+        self.console_manager.print_success(f"Socket service created at {path}")

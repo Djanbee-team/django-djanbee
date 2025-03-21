@@ -60,6 +60,7 @@ def deploy():
         container = DeployContainer.create(app)
 
         container.verify_packages()
+        container.set_up_socket_file()
     except Exception as e:
         print(f"Error {e}")
 

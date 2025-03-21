@@ -29,6 +29,7 @@ from .services.settings_operations.static_files import (
 from .services.settings_operations.ssl import SslHandler, SslHandlerDisplay
 from .services.settings_operations.debug_handler import DebugHandler
 from .services.settings_operations.debug_handler_display import DebugHandlerDisplay
+from .state import DjangoManagerState
 
 
 class DjangoManager:
@@ -52,8 +53,19 @@ class DjangoManager:
         self._ssl_handler = None
         self._debug_handler = None
 
-        # Cache values
+        # Cache values TODO REMOVE THIS
         self._current_project_path = None
+
+    @property
+    def state(self):
+        """
+        Get the current state from DjangoManagerState singleton
+
+        Returns:
+            The DjangoManagerState instance with the freshest data
+        """
+
+        return DjangoManagerState.get_instance()
 
     @property
     def project_service(self):
