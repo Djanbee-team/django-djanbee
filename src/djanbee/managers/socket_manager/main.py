@@ -69,3 +69,15 @@ class SocketManager:
         return self._manager.create_socket_service(
             project_path, project_name, use_sudo=use_sudo
         )
+
+    def start_socket_service(self, project_name: str) -> Tuple[bool, str]:
+        """
+        Starts the socket service for the given project
+
+        Args:
+            project_name: Name of the project (used to identify the service)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        return self._manager.start_socket_service(project_name)

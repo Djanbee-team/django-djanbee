@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Tuple, List, Dict, Optional
-
+import textwrap
 from ...os_manager import OSManager
 from ...console_manager import ConsoleManager
 from ...django_manager import DjangoManager
@@ -98,12 +98,14 @@ class GunicornSocketManager(BaseSocketManager):
             project_path: Path to the project directory
             project_name: Name of the project
             wsgi_app: WSGI application path (e.g., 'myproject.wsgi:application')
+            use_sudo: Whether to use sudo for file operations
 
         Returns:
             Tuple of (success, message or socket_path)
         """
         try:
             # Determine socket path
+
             socket_file_path = project_path / f"{project_name}.sock"
 
             # Determine wsgi_app if not provided
@@ -118,23 +120,29 @@ class GunicornSocketManager(BaseSocketManager):
             service_filename = f"{service_name}.service"
 
             # Create service file content with project-specific description
-            service_content = f"""[Unit]
-    Description=Gunicorn daemon for {project_name}
-    After=network.target
+            service_content = (
+                textwrap.dedent(
+                    f"""
+                [Unit]
+                Description=Gunicorn daemon for {project_name}
+                After=network.target
 
-    [Service]
-    User={user}
-    Group={user}
-    WorkingDirectory={project_path}
-    ExecStart={project_path}/venv/bin/gunicorn \\
-            --access-logfile - \\
-            --workers 3 \\
-            --bind unix:{socket_file_path} \\
-            {wsgi_app}
+                [Service]
+                User={user}
+                Group={user}
+                WorkingDirectory={project_path}
+                ExecStart={self.django_manager.state.active_venv_path}/bin/gunicorn \\
+                        --access-logfile - \\
+                        --workers 3 \\
+                        --bind unix:{socket_file_path} \\
+                        {wsgi_app}
 
-    [Install]
-    WantedBy=multi-user.target
-    """
+                [Install]
+                WantedBy=multi-user.target 
+                """
+                ).strip()
+                + "\n"
+            )
 
             # Write the service file with project-specific name
             service_file_path = Path(f"/etc/systemd/system/{service_filename}")
@@ -152,14 +160,15 @@ class GunicornSocketManager(BaseSocketManager):
             if not reload_success:
                 return False, f"Failed to reload systemd daemon: {reload_message}"
 
-            # Enable and start the service
+            # Enable the service
             enable_success, enable_message = self.os_manager.enable_service(
                 service_name
             )
             if not enable_success:
                 return False, f"Failed to enable service: {enable_message}"
 
-            start_success, start_message = self.os_manager.start_service(service_name)
+            # Use start_socket_service to start the service
+            start_success, start_message = self.start_socket_service(project_name)
             if not start_success:
                 return False, f"Failed to start service: {start_message}"
 
@@ -167,3 +176,47 @@ class GunicornSocketManager(BaseSocketManager):
 
         except Exception as e:
             return False, f"Error creating Gunicorn socket service: {str(e)}"
+
+    def start_socket_service(self, project_name: str) -> Tuple[bool, str]:
+        """
+        Starts the Gunicorn socket service for the given project
+
+        Args:
+            project_name: Name of the project (used to identify the service)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            # Create the service name based on project name
+            service_name = f"gunicorn-{project_name}"
+
+            # Check if the service exists before trying to start it
+            exists, _ = self.check_socket_service_exists(project_name)
+            if not exists:
+                self.console_manager.print_error(
+                    f"Socket service for project '{project_name}' does not exist"
+                )
+                return (
+                    False,
+                    f"Socket service for project '{project_name}' does not exist",
+                )
+
+            # Start the service using the OS manager
+            success, message = self.os_manager.start_service(service_name)
+
+            if success:
+                self.console_manager.print_step_progress(
+                    f"Socket service", f" '{service_name}' started successfully"
+                )
+                return True, f"Socket service started successfully"
+            else:
+                self.console_manager.print_error(
+                    f"Failed to start socket service: {message}"
+                )
+                return False, f"Failed to start socket service: {message}"
+
+        except Exception as e:
+            error_msg = f"Error starting socket service: {str(e)}"
+            self.console_manager.print_error(error_msg)
+            return False, error_msg
