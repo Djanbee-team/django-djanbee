@@ -35,7 +35,13 @@ class AppContainer:
                 console_manager=console_manager,
                 django_manager=django_manager,
                 database_manager=DatabaseManager(os_manager),
+<<<<<<< HEAD
                 server_manager=ServerManager(os_manager, console_manager),
+=======
+                server_manager=ServerManager(
+                    os_manager, console_manager, django_manager
+                ),
+>>>>>>> ddfd42f (deploy command/recovered repo)
                 socket_manager=SocketManager(
                     os_manager, console_manager, django_manager
                 ),

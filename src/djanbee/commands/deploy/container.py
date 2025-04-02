@@ -25,3 +25,9 @@ class DeployContainer:
         if not self.manager.verify_django_project():
             return
         self.manager.find_and_create_socket_file()
+<<<<<<< HEAD
+=======
+
+    def set_up_server(self):
+        self.manager.find_and_create_server_file()
+>>>>>>> ddfd42f (deploy command/recovered repo)

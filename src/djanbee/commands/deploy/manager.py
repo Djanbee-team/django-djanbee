@@ -74,3 +74,38 @@ class DeployManager:
                 )
                 if result:
                     self.display.success_create_socketservice(path)
+<<<<<<< HEAD
+=======
+
+    def find_and_create_server_file(self):
+        """
+        Checks if an Nginx server configuration exists for the current Django project.
+        If it doesn't exist, creates it. If it exists, prompts the user to override it.
+        """
+        project_path = (
+            self.app.django_manager.project_service.state.current_project_path
+        )
+        project_name = project_path.name
+
+        # Check if server configuration exists
+        server_exists, config_path = self.app.server_manager.check_server_config_exists(
+            project_name
+        )
+
+        if not server_exists:
+            # If the server configuration doesn't exist, create it
+            result, path = self.app.server_manager.create_server_config(
+                project_path, project_name, use_sudo=True
+            )
+            if result:
+                self.display.success_create_serverconfig(path)
+
+        else:
+            # If the server configuration exists, prompt user to override
+            if self.display.prompt_override_server(config_path, config_path.name):
+                result, path = self.app.server_manager.create_server_config(
+                    project_path, project_name, use_sudo=True
+                )
+                if result:
+                    self.display.success_create_serverconfig(path)
+>>>>>>> ddfd42f (deploy command/recovered repo)

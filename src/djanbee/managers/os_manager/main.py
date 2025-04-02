@@ -196,7 +196,10 @@ class OSManager:
                 # Use sudo to move the temporary file to the target location
                 move_command = ["sudo", "mv", temp_path, str(path)]
                 result = subprocess.run(move_command, capture_output=True, text=True)
+<<<<<<< HEAD
 
+=======
+>>>>>>> ddfd42f (deploy command/recovered repo)
                 if result.returncode == 0:
                     # Set proper permissions if needed
                     chmod_command = ["sudo", "chmod", "644", str(path)]

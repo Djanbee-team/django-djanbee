@@ -104,9 +104,22 @@ class GunicornSocketManager(BaseSocketManager):
             Tuple of (success, message or socket_path)
         """
         try:
+<<<<<<< HEAD
             # Determine socket path
 
             socket_file_path = project_path / f"{project_name}.sock"
+=======
+            dir_success, dir_message = self.verify_run_gunicorn_directory()
+            if not dir_success:
+                return (
+                    False,
+                    f"Failed to verify or create /run/gunicorn directory: {dir_message}",
+                )
+
+            # Determine socket path
+
+            socket_file_path = f"/run/gunicorn/{project_name}.sock"
+>>>>>>> ddfd42f (deploy command/recovered repo)
 
             # Determine wsgi_app if not provided
             if not wsgi_app:
@@ -130,6 +143,10 @@ class GunicornSocketManager(BaseSocketManager):
                 [Service]
                 User={user}
                 Group={user}
+<<<<<<< HEAD
+=======
+                RuntimeDirectory=gunicorn
+>>>>>>> ddfd42f (deploy command/recovered repo)
                 WorkingDirectory={project_path}
                 ExecStart={self.django_manager.state.active_venv_path}/bin/gunicorn \\
                         --access-logfile - \\
@@ -157,6 +174,10 @@ class GunicornSocketManager(BaseSocketManager):
             reload_success, reload_message = self.os_manager.run_command(
                 ["sudo", "systemctl", "daemon-reload"]
             )
+<<<<<<< HEAD
+=======
+            print(reload_message)
+>>>>>>> ddfd42f (deploy command/recovered repo)
             if not reload_success:
                 return False, f"Failed to reload systemd daemon: {reload_message}"
 
@@ -220,3 +241,104 @@ class GunicornSocketManager(BaseSocketManager):
             error_msg = f"Error starting socket service: {str(e)}"
             self.console_manager.print_error(error_msg)
             return False, error_msg
+<<<<<<< HEAD
+=======
+
+    def verify_run_gunicorn_directory(self) -> Tuple[bool, str]:
+        """
+        Verifies that the /run/gunicorn directory exists and the current user has access to it.
+        Creates the directory if it doesn't exist.
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            # Check if /run/gunicorn directory exists
+            run_gunicorn_path = Path("/run/gunicorn")
+
+            # Check if directory exists using OS manager
+            dir_exists = run_gunicorn_path.exists() and run_gunicorn_path.is_dir()
+
+            if not dir_exists:
+                self.console_manager.print_info(
+                    "The /run/gunicorn directory does not exist. Attempting to create it..."
+                )
+
+                # We need to use sudo to create directory in /run
+                create_result, create_message = self.os_manager.run_command(
+                    ["sudo", "mkdir", "-p", "/run/gunicorn"]
+                )
+
+                if not create_result:
+                    return (
+                        False,
+                        f"Failed to create /run/gunicorn directory: {create_message}",
+                    )
+
+                # Get current username
+                username = self.os_manager.get_username()
+
+                # Set ownership to current user
+                chown_result, chown_message = self.os_manager.run_command(
+                    ["sudo", "chown", f"{username}:{username}", "/run/gunicorn"]
+                )
+
+                if not chown_result:
+                    return (
+                        False,
+                        f"Failed to set permissions on /run/gunicorn: {chown_message}",
+                    )
+
+                # Set directory permissions
+                chmod_result, chmod_message = self.os_manager.run_command(
+                    ["sudo", "chmod", "755", "/run/gunicorn"]
+                )
+
+                if not chmod_result:
+                    return (
+                        False,
+                        f"Failed to set directory permissions: {chmod_message}",
+                    )
+
+                self.console_manager.print_info(
+                    "Successfully created /run/gunicorn directory with proper permissions"
+                )
+                return True, "Directory created and configured successfully"
+
+            # If directory exists, check if current user has write access
+            username = self.os_manager.get_username()
+            access_check, access_message = self.os_manager.run_command(
+                ["test", "-w", "/run/gunicorn"]
+            )
+
+            if not access_check:
+                self.console_manager.print_warning(
+                    f"User '{username}' does not have write access to /run/gunicorn. Attempting to fix permissions..."
+                )
+
+                # Try to fix permissions
+                fix_result, fix_message = self.os_manager.run_command(
+                    ["sudo", "chown", f"{username}:{username}", "/run/gunicorn"]
+                )
+
+                if not fix_result:
+                    return (
+                        False,
+                        f"Failed to set permissions on existing /run/gunicorn directory: {fix_message}",
+                    )
+
+                self.console_manager.print_info(
+                    "Successfully updated permissions on /run/gunicorn directory"
+                )
+                return True, "Directory permissions updated successfully"
+
+            self.console_manager.print_info(
+                f"The /run/gunicorn directory exists and user '{username}' has proper access"
+            )
+            return True, "Directory exists with proper permissions"
+
+        except Exception as e:
+            error_msg = f"Error verifying /run/gunicorn directory: {str(e)}"
+            self.console_manager.print_error(error_msg)
+            return False, error_msg
+>>>>>>> ddfd42f (deploy command/recovered repo)

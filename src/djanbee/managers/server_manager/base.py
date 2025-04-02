@@ -1,6 +1,10 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
+<<<<<<< HEAD
 from typing import List, Tuple
+=======
+from typing import List, Tuple, Optional
+>>>>>>> ddfd42f (deploy command/recovered repo)
 
 
 class BaseServerManager(ABC):
@@ -40,6 +44,46 @@ class BaseServerManager(ABC):
         pass
 
     @abstractmethod
+<<<<<<< HEAD
     def get_server_version(self) -> str:
         """Gets the server version"""
+=======
+    def check_server_config_exists(
+        self, project_name: str
+    ) -> Tuple[bool, Optional[Path]]:
+        """
+        Check if a server configuration exists for the given project
+
+        Args:
+            project_name: Name of the project (used to identify the config)
+
+        Returns:
+            Tuple of (exists, config_file_path)
+            If config doesn't exist, path will be None
+        """
+        pass
+
+    @abstractmethod
+    def create_server_config(
+        self,
+        project_path: Path,
+        project_name: str,
+        server_name: str = "localhost",
+        socket_path: Path = None,
+        use_sudo: bool = False,
+    ) -> Tuple[bool, str]:
+        """
+        Create a server configuration for the given project
+
+        Args:
+            project_path: Path to the project directory
+            project_name: Name of the project
+            server_name: Server name/domain for the config
+            socket_path: Path to the socket file (if applicable)
+            use_sudo: Whether to use sudo for file operations
+
+        Returns:
+            Tuple of (success, message or config_path)
+        """
+>>>>>>> ddfd42f (deploy command/recovered repo)
         pass
