@@ -52,8 +52,6 @@ class DeployDisplay:
 
     def success_create_socketservice(self, path):
         self.console_manager.print_success(f"Socket service created at {path}")
-<<<<<<< HEAD
-=======
 
     def success_create_serverconfig(self, path):
         self.console_manager.print_success(f"Server config created at {path}")
@@ -67,4 +65,3 @@ class DeployDisplay:
             f"This action will replace the current {config_name}",
         )
         return selector.select()
->>>>>>> ddfd42f (deploy command/recovered repo)

@@ -1,10 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-<<<<<<< HEAD
-from typing import List, Tuple
-=======
 from typing import List, Tuple, Optional
->>>>>>> ddfd42f (deploy command/recovered repo)
 
 
 class BaseServerManager(ABC):
@@ -44,10 +40,6 @@ class BaseServerManager(ABC):
         pass
 
     @abstractmethod
-<<<<<<< HEAD
-    def get_server_version(self) -> str:
-        """Gets the server version"""
-=======
     def check_server_config_exists(
         self, project_name: str
     ) -> Tuple[bool, Optional[Path]]:
@@ -85,5 +77,4 @@ class BaseServerManager(ABC):
         Returns:
             Tuple of (success, message or config_path)
         """
->>>>>>> ddfd42f (deploy command/recovered repo)
         pass

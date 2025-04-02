@@ -1,20 +1,3 @@
-<<<<<<< HEAD
-import os
-import subprocess
-from pathlib import Path
-from typing import List, Tuple
-
-from ..base import BaseServerManager
-from ...os_manager import OSManager
-from ...console_manager import ConsoleManager
-
-
-class NginxServerManager(BaseServerManager):
-    def __init__(self, os_manager: OSManager, console_manager: ConsoleManager):
-        """Initialize with OS manager for platform-specific operations"""
-        self.os_manager = os_manager
-        self.console_manager = console_manager
-=======
 from pathlib import Path
 from typing import List, Tuple, Optional
 import textwrap
@@ -35,7 +18,6 @@ class NginxServerManager(BaseServerManager):
         self.os_manager = os_manager
         self.console_manager = console_manager
         self.django_manager = django_manager
->>>>>>> ddfd42f (deploy command/recovered repo)
         self.server_name = "nginx"
         self.dependencies = ["gunicorn"]
 
@@ -116,8 +98,6 @@ class NginxServerManager(BaseServerManager):
             return install_method()
         else:
             return False, f"No installation method for {dependency}"
-<<<<<<< HEAD
-=======
 
     def check_server_config_exists(
         self, project_name: str
@@ -369,4 +349,3 @@ class NginxServerManager(BaseServerManager):
 
         except Exception as e:
             return False, f"Error configuring static file settings: {str(e)}"
->>>>>>> ddfd42f (deploy command/recovered repo)

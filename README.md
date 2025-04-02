@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-TEST2
-=======
 readme_content = """# Djanbee
 
 A free command-line tool to simplify Django project deployment in production environments.
@@ -143,4 +140,3 @@ Currently, Djanbee is optimized for PostgreSQL with peer authentication, which:
 """
 
 print(readme_content)  # Use this to display the string in your console
->>>>>>> ddfd42f (deploy command/recovered repo)

@@ -1,21 +1,10 @@
-<<<<<<< HEAD
-import os
-import platform
-import subprocess
-from pathlib import Path
-from typing import Callable, List, Tuple
-=======
 from pathlib import Path
 from typing import Optional, List, Tuple
->>>>>>> ddfd42f (deploy command/recovered repo)
 from collections import namedtuple
 
 from ..os_manager import OSManager
 from ..console_manager import ConsoleManager
-<<<<<<< HEAD
-=======
 from ..django_manager import DjangoManager
->>>>>>> ddfd42f (deploy command/recovered repo)
 from .server_implementations import NginxServerManager
 
 Result = namedtuple("Result", ["valid", "object"])
@@ -26,26 +15,17 @@ class ServerManager:
         self,
         os_manager: OSManager,
         console_manager: ConsoleManager,
-<<<<<<< HEAD
-=======
         django_manager: DjangoManager,
->>>>>>> ddfd42f (deploy command/recovered repo)
         server_type: str = "nginx",
     ):
         """Initializes server-specific manager"""
         self.os_manager = os_manager
         self.console_manager = console_manager
-<<<<<<< HEAD
-
-        if server_type.lower() == "nginx":
-            self._manager = NginxServerManager(self.os_manager, self.console_manager)
-=======
         self.django_manager = django_manager
         if server_type.lower() == "nginx":
             self._manager = NginxServerManager(
                 self.os_manager, self.console_manager, self.django_manager
             )
->>>>>>> ddfd42f (deploy command/recovered repo)
         else:
             raise ValueError(f"Unsupported server type: {server_type}")
 
@@ -98,8 +78,6 @@ class ServerManager:
         if hasattr(self._manager, "install_dependency"):
             return self._manager.install_dependency(dependency)
         return False, "Server doesn't support dependency installation"
-<<<<<<< HEAD
-=======
 
     def check_server_config_exists(
         self, project_name: str
@@ -140,4 +118,3 @@ class ServerManager:
         return self._manager.create_server_config(
             project_path, project_name, server_name, socket_path, use_sudo
         )
->>>>>>> ddfd42f (deploy command/recovered repo)

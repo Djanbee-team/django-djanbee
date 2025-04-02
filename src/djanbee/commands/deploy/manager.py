@@ -74,8 +74,6 @@ class DeployManager:
                 )
                 if result:
                     self.display.success_create_socketservice(path)
-<<<<<<< HEAD
-=======
 
     def find_and_create_server_file(self):
         """
@@ -108,4 +106,3 @@ class DeployManager:
                 )
                 if result:
                     self.display.success_create_serverconfig(path)
->>>>>>> ddfd42f (deploy command/recovered repo)

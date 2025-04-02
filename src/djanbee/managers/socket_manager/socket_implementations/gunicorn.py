@@ -104,11 +104,6 @@ class GunicornSocketManager(BaseSocketManager):
             Tuple of (success, message or socket_path)
         """
         try:
-<<<<<<< HEAD
-            # Determine socket path
-
-            socket_file_path = project_path / f"{project_name}.sock"
-=======
             dir_success, dir_message = self.verify_run_gunicorn_directory()
             if not dir_success:
                 return (
@@ -119,7 +114,6 @@ class GunicornSocketManager(BaseSocketManager):
             # Determine socket path
 
             socket_file_path = f"/run/gunicorn/{project_name}.sock"
->>>>>>> ddfd42f (deploy command/recovered repo)
 
             # Determine wsgi_app if not provided
             if not wsgi_app:
@@ -143,10 +137,7 @@ class GunicornSocketManager(BaseSocketManager):
                 [Service]
                 User={user}
                 Group={user}
-<<<<<<< HEAD
-=======
                 RuntimeDirectory=gunicorn
->>>>>>> ddfd42f (deploy command/recovered repo)
                 WorkingDirectory={project_path}
                 ExecStart={self.django_manager.state.active_venv_path}/bin/gunicorn \\
                         --access-logfile - \\
@@ -174,10 +165,7 @@ class GunicornSocketManager(BaseSocketManager):
             reload_success, reload_message = self.os_manager.run_command(
                 ["sudo", "systemctl", "daemon-reload"]
             )
-<<<<<<< HEAD
-=======
             print(reload_message)
->>>>>>> ddfd42f (deploy command/recovered repo)
             if not reload_success:
                 return False, f"Failed to reload systemd daemon: {reload_message}"
 
@@ -241,8 +229,6 @@ class GunicornSocketManager(BaseSocketManager):
             error_msg = f"Error starting socket service: {str(e)}"
             self.console_manager.print_error(error_msg)
             return False, error_msg
-<<<<<<< HEAD
-=======
 
     def verify_run_gunicorn_directory(self) -> Tuple[bool, str]:
         """
@@ -341,4 +327,3 @@ class GunicornSocketManager(BaseSocketManager):
             error_msg = f"Error verifying /run/gunicorn directory: {str(e)}"
             self.console_manager.print_error(error_msg)
             return False, error_msg
->>>>>>> ddfd42f (deploy command/recovered repo)
