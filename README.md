@@ -1,4 +1,4 @@
-readme_content = """# Djanbee
+# Djanbee
 
 A free command-line tool to simplify Django project deployment in production environments.
 
@@ -137,6 +137,3 @@ Currently, Djanbee is optimized for PostgreSQL with peer authentication, which:
 ## Contributing
 
 [Insert contribution guidelines here]
-"""
-
-print(readme_content)  # Use this to display the string in your console
