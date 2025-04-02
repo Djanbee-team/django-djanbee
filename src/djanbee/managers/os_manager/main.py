@@ -43,6 +43,12 @@ class OSManager:
         """Gets platform-specific pip executable path"""
         return self._manager.get_pip_path(venv_path)
 
+    def check_pip_package_installed(self, package_name: str) -> bool:
+        return self._manager.check_pip_package_installed(package_name)
+
+    def install_pip_package(self, package_name: str) -> Tuple[bool, str]:
+        return self._manager.install_pip_package(package_name)
+
     def check_package_installed(self, package_name: str) -> bool:
         """Checks if a system package is installed"""
         return self._manager.check_package_installed(package_name)
@@ -160,11 +166,44 @@ class OSManager:
         """Check if a file exists"""
         return path.exists() and path.is_file()
 
-    def write_text_file(self, path: Path, content: str) -> Tuple[bool, str]:
-        """Write text content to a file"""
+    def write_text_file(
+        self, path: Path, content: str, use_sudo: bool = False
+    ) -> Tuple[bool, str]:
+        """
+        Write text content to a file, optionally using sudo
+
+        Args:
+            path: Path to the file
+            content: Text content to write
+            use_sudo: Whether to use sudo privileges (default: False)
+
+        Returns:
+            Tuple of (success, message)
+        """
         try:
-            path.write_text(content)
-            return True, "File written successfully"
+            if not use_sudo:
+                # Direct write without sudo
+                path.write_text(content)
+                return True, "File written successfully"
+            else:
+                # Create a temporary file first
+                import tempfile
+
+                with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp:
+                    temp_path = temp.name
+                    temp.write(content)
+
+                # Use sudo to move the temporary file to the target location
+                move_command = ["sudo", "mv", temp_path, str(path)]
+                result = subprocess.run(move_command, capture_output=True, text=True)
+                if result.returncode == 0:
+                    # Set proper permissions if needed
+                    chmod_command = ["sudo", "chmod", "644", str(path)]
+                    subprocess.run(chmod_command, capture_output=True, text=True)
+                    return True, "File written successfully with sudo"
+                else:
+                    return False, f"Error writing file with sudo: {result.stderr}"
+
         except Exception as e:
             return False, f"Error writing file: {str(e)}"
 

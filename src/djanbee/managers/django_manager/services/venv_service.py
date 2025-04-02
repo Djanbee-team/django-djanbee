@@ -39,7 +39,6 @@ class DjangoEnvironmentService:
 
     def is_venv(self, path="."):
         """Check if path is a virtual environment"""
-        print("HERE")
         path = Path(path) if not isinstance(path, Path) else path
         return self.os_manager.is_venv_directory(path)
 

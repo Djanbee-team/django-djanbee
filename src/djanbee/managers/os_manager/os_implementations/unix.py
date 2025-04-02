@@ -15,6 +15,39 @@ class UnixOSManager(BaseOSManager):
         """Gets platform-specific pip executable path"""
         return venv_path / "bin" / "pip"
 
+    def check_pip_package_installed(self, package_name: str) -> bool:
+        """Checks if a Python package is installed via pip"""
+        try:
+            import sys
+
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "show", package_name],
+                capture_output=True,
+                text=True,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def install_pip_package(self, package_name: str) -> Tuple[bool, str]:
+        """Installs a Python package via pip"""
+        try:
+            import sys
+
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", package_name],
+                capture_output=True,
+                text=True,
+            )
+
+            if result.returncode == 0:
+                return True, f"Successfully installed {package_name}"
+            else:
+                return False, f"Failed to install {package_name}: {result.stderr}"
+
+        except Exception as e:
+            return False, f"Error installing package: {str(e)}"
+
     def check_package_installed(self, package_name: str) -> bool:
         """Checks if a system package is installed"""
         try:
