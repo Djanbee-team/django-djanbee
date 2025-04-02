@@ -1,23 +1,29 @@
+from typing import Optional
 from .display import LaunchDisplay
 from ...core import AppContainer
 
 
 class LaunchManager:
-    def __init__(self, display: LaunchDisplay, app: "AppContainer"):
+    """Manages Django project initialization and selection."""
+    
+    def __init__(self, display: LaunchDisplay, app: AppContainer) -> None:
         self.display = display
         self.app = app
 
-    def launch_project(self, path: str = "") -> None:
-        """
-        Main method to handle Django project launch logic
-
+    def launch_project(self, path: str = "") -> Optional[object]:
+        """Initialize environment and select Django project.
+        
         Args:
-            path (str): Optional path to Django project
+            path: Optional path to Django project directory
+            
+        Returns:
+            Selected project object or None if no project found
         """
+        # Show splash screen
         self.display.display_splash_screen()
 
-        # Initialize directory
+        # Initialize working directory
         self.app.django_manager.project_service.initialize_directory(path)
 
-        # Find and launch Django project
-        project = self.app.django_manager.project_service.select_project()
+        # Find and select Django project
+        return self.app.django_manager.project_service.select_project()

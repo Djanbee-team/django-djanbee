@@ -7,10 +7,30 @@ from getpass import getpass
 class ConsoleManager:
     def __init__(self):
         self.console = Console()
-
+        
+    def print_logo(self):
+        """Print the Djanbee ASCII logo with a bee"""
+        logo = r"""
+[#FF8800]    ____  _              [#f8f272] _                [/]
+[#FF8800]   |  _ \(_) __ _ _ __   [#f8f272]| |__   ___  ___ [/]            | )/ )[/]
+[#FF8800]   | | | | |/ _` | '_ \  [#f8f272]| '_ \ / _ \/ _ \ [/]        \\ |//,' [/]
+[#FF8800]   | |_| | | (_| | | | | [#000000]| |_) |  __/  __/[/]        (")(_)-"()))=-[/]
+[#FF8800]   |____/|_|\__,_|_| |_| [#f8f272]|_.__/ \___|\___|[/]           (\\ [/]
+        [#FF8800]<__|[/]
+          
+        """
+        
+        self.console.print(Panel(
+            logo,
+            border_style="#f8f272",
+            box=box.HEAVY,
+            title="[yellow]Django Deployment Tool[/]",
+            subtitle="[#f8f272]Bee-ploy fast — get ready honey![/]"
+        ))
+        
     def print_package(self, message):
         text = Text()
-        text.append("📦 ", style="")  # Database emoji
+        text.append("📦 ", style="")  # Package emoji
         text.append(message, style="bright_blue")
         self.console.print(text, end="")
 
@@ -20,8 +40,22 @@ class ConsoleManager:
         self.console.print(Panel(error_msg, box=box.DOUBLE))
 
     def print_success(self, text: str):
-        success_msg = Text(text, style="bold green")
-        self.console.print(Panel(success_msg, box=box.DOUBLE))
+        """Print success message with thumbs up icon and green text in a panel with highlighted paths"""
+        # Add a blank line before for margin
+        self.console.print("")
+        
+        # Use Rich's built-in highlighting
+        self.console.print(Panel(
+            f"👍 {text}",
+            box=box.HEAVY,  # Heavy border
+            border_style="green",  # Green border
+            style="bold green",  # Bold green text 
+            padding=(1, 1),  # Minimal padding
+            highlight=True  # Enable automatic highlighting of paths
+        ))
+        
+        # Add a blank line after for margin
+        self.console.print("")
 
     def print_error(self, e: str):
         self.console.print(f"[red]Error: {str(e)}[/]")
