@@ -5,16 +5,21 @@ from ...managers import ConsoleManager
 
 
 class LaunchDisplay:
-    def __init__(self, console_manager: "ConsoleManager"):
+    """Handles display output for the launch command."""
+    
+    def __init__(self, console_manager: ConsoleManager) -> None:
         self.console_manager = console_manager
 
-    def display_splash_screen(self):
-        title = Text("Djanbee deployment service", style="bold white", justify="center")
+    def display_splash_screen(self) -> None:
+        """Display welcome splash screen with service info."""
+        # Display bee logo
+        self.console_manager.print_logo()
+        
+        # Display warning about privileges
         warning = Text(
-            "\nThe setup might require root privileges",
+            "The setup might require root privileges",
             style="yellow",
             justify="center",
         )
-        content = Text.assemble(title, warning)
-
-        self.console_manager.console.print(Panel(content, box=box.DOUBLE, style="blue"))
+        
+        self.console_manager.console.print(Panel(warning, box=box.SIMPLE, style="blue"))
