@@ -1,6 +1,7 @@
 from ..settings_service import DjangoSettingsService
 from .databases_handler_display import DatabasesHandlerDisplay
 from ..venv_service import DjangoEnvironmentService
+from .....managers import EnvManager
 
 
 class DatabasesHandler:
@@ -13,6 +14,8 @@ class DatabasesHandler:
         self.settings_service = settings_service
         self.venv_service = venv_service
         self.display = display
+        self.postgres_dependencies = ["psycopg2-binary"]
+        # The env_manager will be accessed lazily when needed
 
     def handle_databases(self):
         """Main entry point for database configuration handling."""
@@ -64,11 +67,21 @@ class DatabasesHandler:
 
     def _check_and_install_dependencies(self, venv_path):
         """Check for and install missing PostgreSQL dependencies."""
-        # Check if PostgreSQL dependencies are installed
-        all_installed, missing_packages = (
-            self.settings_service.os_manager.check_postgres_dependencies(venv_path)
-        )
-
+        # Access the env_manager through the django_manager when needed
+        env_manager = self._get_env_manager()
+        
+        if not env_manager:
+            # Fallback to old method if env_manager not available
+            all_installed, missing_packages = (
+                self.settings_service.os_manager.check_postgres_dependencies(venv_path)
+            )
+        else:
+            # Use env_manager to check PostgreSQL dependencies
+            missing_packages = env_manager.get_missing_packages(
+                venv_path, self.postgres_dependencies
+            )
+            all_installed = len(missing_packages) == 0
+        
         if not all_installed:
             self._install_missing_dependencies(venv_path, missing_packages)
         else:
@@ -79,10 +92,32 @@ class DatabasesHandler:
         result = self.display.prompt_install_database_dependencies(missing_packages)
         if result:
             self.display.print_progress_database_dependencies_install()
-            success, message = (
-                self.settings_service.os_manager.ensure_postgres_dependencies(venv_path)
-            )
+            
+            env_manager = self._get_env_manager()
+            if env_manager:
+                # Use new method with env_manager
+                success, message, _ = env_manager.ensure_dependencies(
+                    venv_path, self.postgres_dependencies
+                )
+            else:
+                # Fallback to old method
+                success, message = (
+                    self.settings_service.os_manager.ensure_postgres_dependencies(venv_path)
+                )
+                
             print(message)
+            
+    def _get_env_manager(self):
+        """Safely get the env_manager, handling potential circular references"""
+        try:
+            if (hasattr(self.settings_service, 'django_manager') and 
+                self.settings_service.django_manager and 
+                hasattr(self.settings_service.django_manager, 'env_manager')):
+                return self.settings_service.django_manager.env_manager
+        except Exception:
+            # If any error occurs, return None to use fallback method
+            pass
+        return None
 
     def edit_database_settings(self, new_databases):
         """

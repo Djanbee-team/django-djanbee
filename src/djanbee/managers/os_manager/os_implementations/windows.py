@@ -158,3 +158,35 @@ class WindowsOSManager(BaseOSManager):
             return file_path.exists() and file_path.is_file()
         except Exception:
             return False
+            
+    def reload_daemon(self) -> Tuple[bool, str]:
+        """
+        Windows doesn't have a daemon system like Linux.
+        This is a no-op on Windows.
+        
+        Returns:
+            Tuple of (success, message)
+        """
+        return True, "No daemon reload needed on Windows"
+        
+    def user_exists(self, username: str) -> bool:
+        """
+        Check if a Windows user exists.
+        
+        Args:
+            username: Username to check
+            
+        Returns:
+            bool: True if user exists, False otherwise
+        """
+        try:
+            # Use net user command to check if user exists
+            result = subprocess.run(
+                ["net", "user", username],
+                capture_output=True,
+                text=True,
+            )
+            return result.returncode == 0
+        except Exception:
+            # If any error occurs, assume user doesn't exist
+            return False

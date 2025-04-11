@@ -282,4 +282,17 @@ class OSManager:
         self._manager.is_venv_directory(path)
     
     def reload_daemon(self) -> Tuple[bool, str]:
+        """Reload system daemon"""
         return self._manager.reload_daemon()
+        
+    def user_exists(self, username: str) -> bool:
+        """
+        Check if a system user exists.
+        
+        Args:
+            username: Username to check
+            
+        Returns:
+            bool: True if user exists, False otherwise
+        """
+        return self._manager.user_exists(username)

@@ -58,7 +58,7 @@ class ConfigureContainer:
 
     def _run_specific_steps(self, path: str, steps: Set[ConfigStep]) -> None:
         step_handlers = {
-            ConfigStep.DATABASE: self.configure_database_manager._configure_database,
+            ConfigStep.DATABASE: self.configure_database_manager.configure_database,
             ConfigStep.SETTINGS: self.configure_settings_manager._configure_settings,
         }
 
@@ -67,5 +67,6 @@ class ConfigureContainer:
                 step_handlers[step](path)
 
     def _configure_all(self, path: str) -> None:
-        self.configure_database_manager._configure_database(path)
+        if not self.configure_database_manager.configure_database(path):
+            return False
         self.configure_settings_manager._configure_settings(path)

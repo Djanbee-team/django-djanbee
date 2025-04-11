@@ -81,4 +81,10 @@ class BaseOSManager(ABC):
 
     @abstractmethod
     def reload_daemon(self) -> Tuple[bool, str]:
+        """Reload system daemon"""
+        pass
+        
+    @abstractmethod
+    def user_exists(self, username: str) -> bool:
+        """Check if a system user exists"""
         pass

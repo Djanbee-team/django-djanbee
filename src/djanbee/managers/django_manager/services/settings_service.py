@@ -11,10 +11,13 @@ Result = namedtuple("Result", ["valid", "object"])
 class DjangoSettingsService:
     """Service for managing Django settings"""
 
-    def __init__(self, os_manager: OSManager, display: DjangoSettingsServiceDisplay):
+    def __init__(self, os_manager: OSManager, display: DjangoSettingsServiceDisplay, django_manager=None):
         self.os_manager = os_manager
         self.state = DjangoManagerState.get_instance()
         self.display = display
+        # The django_manager attribute will be set after initialization by the DjangoManager itself
+        # to avoid circular references. It's default None here but will be populated later
+        self.django_manager = django_manager
 
     def find_settings(self):
         self.display.print_lookup_settings()

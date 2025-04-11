@@ -35,10 +35,11 @@ from .state import DjangoManagerState
 class DjangoManager:
     """Container for Django-related services with lazy loading"""
 
-    def __init__(self, os_manager: OSManager, console_manager: ConsoleManager):
+    def __init__(self, os_manager: OSManager, console_manager: ConsoleManager, env_manager=None):
         """Initialize the Django manager with dependencies but not services"""
         self.os_manager = os_manager
         self.console_manager = console_manager
+        self.env_manager = env_manager
 
         # Initialize service placeholders
         self._project_service = None
@@ -99,9 +100,12 @@ class DjangoManager:
     def settings_service(self):
         """Lazy load the settings service when first accessed"""
         if self._settings_service is None:
+            # Create the settings service
             self._settings_service = DjangoSettingsService(
                 self.os_manager, DjangoSettingsServiceDisplay(self.console_manager)
             )
+            # Set a reference to self to avoid circular import issues
+            self._settings_service.django_manager = self
         return self._settings_service
 
     @property

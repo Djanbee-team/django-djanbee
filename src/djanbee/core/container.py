@@ -7,6 +7,7 @@ from ..managers import (
     DatabaseManager,
     ServerManager,
     SocketManager,
+    EnvManager,
 )
 
 
@@ -20,6 +21,7 @@ class AppContainer:
     database_manager: "DatabaseManager"
     server_manager: "ServerManager"
     socket_manager: "SocketManager"
+    env_manager: "EnvManager"
 
     _instance: Optional["AppContainer"] = None
 
@@ -28,18 +30,24 @@ class AppContainer:
         if cls._instance is None:
             os_manager = OSManager()
             console_manager = ConsoleManager()
-            django_manager = DjangoManager(os_manager, console_manager)
-
+            
+            # Create the environment manager first
+            env_manager = EnvManager(os_manager, console_manager)
+            
+            # Pass env_manager to django_manager
+            django_manager = DjangoManager(os_manager, console_manager, env_manager)
+            
             cls._instance = cls(
                 os_manager=os_manager,
                 console_manager=console_manager,
                 django_manager=django_manager,
-                database_manager=DatabaseManager(os_manager),
+                database_manager=DatabaseManager(os_manager, console_manager, env_manager),
                 server_manager=ServerManager(
                     os_manager, console_manager, django_manager
                 ),
                 socket_manager=SocketManager(
                     os_manager, console_manager, django_manager
                 ),
+                env_manager=env_manager,
             )
         return cls._instance

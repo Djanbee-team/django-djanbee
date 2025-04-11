@@ -1,6 +1,7 @@
 from pathlib import Path
-from typing import Tuple, List, Optional, Dict, Any, Union, cast
+from typing import Tuple, List, Optional, Union, cast
 
+from djanbee.managers.env_manager import EnvManager
 from .base_handler import StaticFilesHandler
 from ...settings_service import DjangoSettingsService
 from .static_root_handler_display import StaticRootHandlerDisplay
@@ -9,40 +10,44 @@ from ...venv_service import DjangoEnvironmentService
 
 class WhiteNoiseHandler(StaticFilesHandler):
     """Handler for configuring WhiteNoise static files in Django"""
+
     def __init__(
         self,
         settings_service: DjangoSettingsService,
         display: StaticRootHandlerDisplay,
         venv_service: DjangoEnvironmentService,
+        env_manager: Optional[EnvManager] = None,
     ) -> None:
         """
         Initialize the WhiteNoise handler
-        
+
         Args:
             settings_service: Service for managing Django settings
             display: Display service for user interaction
             venv_service: Service for virtual environment operations
+            env_manager: Optional EnvManager for dependency management
         """
         self.settings_service = settings_service
         self.display = display
         self.venv_service = venv_service
+        self.env_manager = env_manager
 
     def handle(self) -> bool:
         """
         Configure Django settings for WhiteNoise static files handling
-        
+
         Returns:
             bool: True if setup was successful, False otherwise
         """
         # Get the active virtual environment
         if not self.venv_service.state.active_venv_path:
             self.venv_service.get_active_venv()
-        
+
         active_venv = self.venv_service.state.active_venv_path
         if not active_venv:
             print("No active virtual environment detected")
             return False
-        
+
         venv_path = active_venv
 
         # Install WhiteNoise if needed
@@ -60,37 +65,37 @@ class WhiteNoiseHandler(StaticFilesHandler):
         # Configure middleware
         if not self.configure_whitenoise_middleware():
             return False
-        
+
         # Configure basic static file settings using parent class methods
         if not super().setup_static_url():
             return False
-        
+
         if not super().setup_static_root():
             return False
-        
+
         if not super().setup_staticfiles_dirs("Whitenoise"):
             return False
-        
+
         # Configure WhiteNoise storage backend
         if not self.configure_storage_backend():
             return False
-        
+
         return True
 
     def configure_whitenoise_middleware(self) -> bool:
         """
         Configure Django middleware for WhiteNoise
-        
+
         Returns:
             bool: True if successful, False otherwise
         """
-        middleware = self.settings_service.find_in_settings(
-            "MIDDLEWARE", default=[]
-        )
-        
+        middleware = self.settings_service.find_in_settings("MIDDLEWARE", default=[])
+
         # Cast to ensure type checker knows this is a list
-        middleware_list = cast(List[str], middleware if isinstance(middleware, list) else [])
-        
+        middleware_list = cast(
+            List[str], middleware if isinstance(middleware, list) else []
+        )
+
         is_whitenoise = self.is_whitenoise_properly_configured(middleware_list)
 
         if not is_whitenoise:
@@ -105,7 +110,7 @@ class WhiteNoiseHandler(StaticFilesHandler):
     def configure_storage_backend(self) -> bool:
         """
         Configure WhiteNoise storage backend
-        
+
         Returns:
             bool: True if successful, False otherwise
         """
@@ -207,7 +212,9 @@ class WhiteNoiseHandler(StaticFilesHandler):
 
         return new_middleware_list
 
-    def check_whitenoise_installed(self, venv_path: Union[str, Path]) -> Tuple[bool, str]:
+    def check_whitenoise_installed(
+        self, venv_path: Union[str, Path]
+    ) -> Tuple[bool, str]:
         """
         Check if WhiteNoise is installed in the virtual environment.
 
@@ -228,6 +235,7 @@ class WhiteNoiseHandler(StaticFilesHandler):
     def install_whitenoise(self, venv_path: Union[str, Path]) -> Tuple[bool, str]:
         """
         Install WhiteNoise in the virtual environment if not already installed.
+        Uses the EnvManager for dependency management when available.
 
         Args:
             venv_path: Path to the virtual environment
@@ -240,15 +248,32 @@ class WhiteNoiseHandler(StaticFilesHandler):
         if is_installed:
             return True, "WhiteNoise is already installed"
 
-        # Install WhiteNoise
+        # Use env_manager if available
+        if self.env_manager:
+            # Use env_manager to handle installation with proper prompts
+            success, message, _ = self.env_manager.ensure_dependencies(
+                venv_path,
+                ["whitenoise"],
+                "Install WhiteNoise for static files handling?",
+            )
+            return success, message
+
+        # Fallback to direct pip installation
         pip_path = self.settings_service.os_manager.get_pip_path(Path(venv_path))
         try:
+            # Show progress message
+            self.display.print_progress("Installing WhiteNoise...")
+
             result = self.settings_service.os_manager.run_command(
                 [str(pip_path), "install", "whitenoise"]
             )
             if result[0]:
+                self.display.print_success("WhiteNoise installed successfully")
                 return True, "WhiteNoise installed successfully"
             else:
+                self.display.print_error(f"Failed to install WhiteNoise: {result[1]}")
                 return False, f"Failed to install WhiteNoise: {result[1]}"
         except Exception as e:
-            return False, f"Error installing WhiteNoise: {str(e)}"
+            error_msg = f"Error installing WhiteNoise: {str(e)}"
+            self.display.print_error(error_msg)
+            return False, error_msg
