@@ -1,18 +1,24 @@
-from typing import Tuple
-from ..managers import OSManager
-import psycopg2
-from psycopg2 import Error
+from typing import Tuple, List, Optional
+from ..managers import OSManager, ConsoleManager, EnvManager
 
 
 class DatabaseManager:
-    def __init__(self, os_manager: OSManager):
+    def __init__(
+        self,
+        os_manager: OSManager,
+        console_manager: Optional[ConsoleManager] = None,
+        env_manager: Optional[EnvManager] = None,
+    ):
         self.os_manager = os_manager
+        self.console_manager = console_manager
+        self.env_manager = env_manager
         self._superuser = "postgres"
         self._superuser_password = ""
         self.host = ""
         self.database = "postgres"
         self.username = ""
         self._db_name = ""
+        self.dependencies = ["psycopg2-binary"]
 
     # Property getters/setters
     @property
@@ -39,13 +45,16 @@ class DatabaseManager:
     def db_name(self, value: str):
         self._db_name = value
 
-    def create_database(self, db_name: str) -> Tuple[bool, str]:
-        """Create a new database."""
-        return self.execute_admin_command(f"CREATE DATABASE {db_name};")
-
     # Core database connection methods
     def _get_admin_connection(self):
         """Get connection with superuser privileges using peer authentication."""
+        # Ensure dependencies are installed
+        if not self.ensure_dependencies():
+            raise ImportError("Database dependencies not available")
+
+        # Dynamic import to avoid startup errors if package is missing
+        import psycopg2
+
         return psycopg2.connect(
             dbname=self.database,
             user=self.superuser,
@@ -56,6 +65,13 @@ class DatabaseManager:
         self.username = username
 
     def _get_connection(self):
+        # Ensure dependencies are installed
+        if not self.ensure_dependencies():
+            raise ImportError("Database dependencies not available")
+
+        # Dynamic import to avoid startup errors if package is missing
+        import psycopg2
+
         return psycopg2.connect(
             dbname=self.database,
             user=self.username,
@@ -65,11 +81,20 @@ class DatabaseManager:
     def login_user(self, username):
         self.set_database_user(username)
         try:
+            # Ensure dependencies are installed
+            if not self.ensure_dependencies():
+                return False, "Database dependencies not available"
+
+            # Dynamic import to avoid startup errors if package is missing
+            import psycopg2
+
             conn = self._get_connection()
             conn.close()
             return True, "Login successful"
         except psycopg2.Error as e:
             return False, f"Login failed: {str(e)}"
+        except ImportError as e:
+            return False, f"Database dependency error: {str(e)}"
         except Exception as e:
             return False, f"Unexpected error during login: {str(e)}"
 
@@ -239,3 +264,71 @@ class DatabaseManager:
 
         except Exception as e:
             return False, f"Error getting databases: {str(e)}"
+
+    # Dependency management methods
+    def get_dependencies(self) -> List[str]:
+        """Returns the list of dependencies required by the database manager"""
+        return self.dependencies
+
+    def check_dependency_installed(self, dependency: str) -> bool:
+        """Checks if a specific dependency is installed"""
+        if dependency == "psycopg2-binary":
+            return self.os_manager.check_pip_package_installed(
+                "psycopg2"
+            ) or self.os_manager.check_pip_package_installed("psycopg2-binary")
+        return False
+
+    def install_dependency(self, dependency: str) -> Tuple[bool, str]:
+        """Install a specific dependency"""
+        if dependency not in self.dependencies:
+            return False, f"{dependency} is not a recognized dependency"
+
+        if dependency == "psycopg2-binary":
+            # First ensure libpq-dev is installed (needed for psycopg2)
+            success, message = self.os_manager.install_package("libpq-dev")
+            if not success and self.console_manager:
+                self.console_manager.print_step_failure("Dependencies", message)
+
+            # Install with pip
+            return self.os_manager.install_pip_package("psycopg2-binary")
+
+        return False, f"No installation method for {dependency}"
+
+    def verify_dependencies(self) -> List[Tuple[str, bool, str]]:
+        """Verifies all dependencies and returns results"""
+        results = []
+        for dependency in self.dependencies:
+            is_installed = self.check_dependency_installed(dependency)
+            status_msg = (
+                f"{dependency} is {'installed' if is_installed else 'not installed'}"
+            )
+            results.append((dependency, is_installed, status_msg))
+        return results
+
+    def ensure_dependencies(self) -> bool:
+        """
+        Ensures all database dependencies are installed, prompting for installation if needed.
+        Uses the centralized EnvManager for Python packages.
+
+        Returns:
+            bool: True if all dependencies are available (or were successfully installed), False otherwise
+        """
+        # First ensure system dependencies (libpq-dev is needed for psycopg2)
+        success, message = self.os_manager.install_package("libpq-dev")
+        if not success and self.console_manager:
+            self.console_manager.print_step_failure("System Dependency", message)
+
+        # Use the env_manager to handle Python package dependencies if available
+        if self.env_manager:
+            success, message, _ = self.env_manager.ensure_dependencies(
+                None,  # Will use active venv or system Python
+                self.dependencies,
+                "Install required database dependencies?",
+            )
+            return success
+
+        # Fallback to directly checking packages if env_manager not provided
+        return all(
+            self.os_manager.check_pip_package_installed(pkg)
+            for pkg in self.dependencies
+        )

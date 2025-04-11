@@ -10,25 +10,36 @@ class ConfigureDatabaseManager:
         self.display = display
         self.app = app
 
-    def _configure_database(self, path: str) -> None:
-        """Main entry point for database configuration."""
+    def configure_database(self, path: str) -> bool:
+        """
+        Main entry point for database configuration.
+
+        Args:
+            path: Project path
+
+        Returns:
+            bool: True if configuration was successful, False otherwise
+        """
         self.display.show_lookup_database()
 
+        # Ensure PostgreSQL is installed and running
         if not self._ensure_installation():
-            return
-        print("TEST")
+            return False
+
         if not self._ensure_service_running():
-            return
+            return False
 
         self.display.success_database_running()
 
+        # Handle user login/creation
         user = self._handle_user()
         if not user:
-            return
+            return False
 
         self.display.success_login_user(user)
 
-        self._handle_database_create_or_connect()
+        # Handle database creation/connection
+        return self._handle_database_create_or_connect()
 
     def _ensure_installation(self) -> bool:
         """Ensure PostgreSQL is installed, install if needed."""
@@ -36,7 +47,6 @@ class ConfigureDatabaseManager:
 
         if not is_installed:
             return self._handle_installation()
-
         self.display.success_database_installed(location)
         return True
 
@@ -55,7 +65,7 @@ class ConfigureDatabaseManager:
 
         if not self.display.prompt_install_database():
             return False
-
+        self.display.progress_install_database()
         try:
             if not self._run_installation():
                 return False
@@ -78,10 +88,12 @@ class ConfigureDatabaseManager:
             return False
 
     def _run_installation(self) -> bool:
-        """Run the actual installation process."""
-        installation = self.app.database_manager.install_postgres()
-
+        """Run the actual installation process with progress reporting."""
         try:
+            # Get installation generator
+            installation = self.app.database_manager.install_postgres()
+
+            # Process each installation step and show progress
             for step_name, success, message in installation:
                 if success:
                     self.display.print_installation_progress(step_name, message)
@@ -98,50 +110,88 @@ class ConfigureDatabaseManager:
 
     def _handle_service_start(self) -> bool:
         """Handle starting PostgreSQL service."""
+        db_manager = self.app.database_manager
+
+        # Show service not running error
         self.display.error_database_running()
 
+        # Prompt to start service
         if not self.display.prompt_enable_database():
             return False
 
-        enabled, message = self.app.database_manager.configure_postgres_service()
-        if not enabled:
+        # Try to start service
+        success, message = db_manager.configure_postgres_service()
+        if not success:
             self.display.error_database_running()
+            self.display.print_step_failure("Service", message)
             return False
 
-        is_running = self.app.database_manager.check_postgres_status()
+        # Verify service is running
+        is_running = db_manager.check_postgres_status()
+        if not is_running:
+            self.display.error_database_running()
+            self.display.print_step_failure(
+                "Service", "Service enabled but not running"
+            )
+
         return is_running
 
     def _handle_user(self):
+        """Handle user creation or login."""
         user = self.app.os_manager.get_username()
         is_admin = self.app.os_manager.is_admin()
+        db_manager = self.app.database_manager
 
         login = self.display.prompt_user_create_or_login(is_admin)
-        if login is not None:
-            if not login:
-                flag, response = self.app.database_manager.create_user(user)
-                if not flag:
-                    self.display.error_create_user(response)
-                    return False
-                self.display.success_create_user(user)
+        if login is None:
+            return False
 
-            flag, response = self.app.database_manager.login_user(user)
-            if not flag:
-                self.display.error_login_user(response)
+        # Create user if requested
+        if not login:
+            success, message = db_manager.create_user(user)
+            if not success:
+                self.display.error_create_user(message)
                 return False
-            return user
+            self.display.success_create_user(user)
+
+        # Login with the user
+        success, message = db_manager.login_user(user)
+        if not success:
+            self.display.error_login_user(message)
+            return False
+
+        return user
 
     def _handle_database_create_or_connect(self):
-        create = self.display.prompt_database_create_or_connect()
+        """Handle database creation or connection."""
+        db_manager = self.app.database_manager
 
-        if create:
+        if self.display.prompt_database_create_or_connect():
+            # Create new database
             db_name = self.display.input_database_name()
-            self.app.database_manager.create_database(db_name)
+            success, message = db_manager.create_database(db_name)
+            if not success:
+                self.display.print_step_failure(
+                    "Database", f"Failed to create database: {message}"
+                )
+                return False
         else:
-            flag, databases = self.app.database_manager.get_all_databases()
-            database = self.display.prompt_select_database(databases)
-            self.app.database_manager.db_name = database
+            # Connect to existing database
+            success, databases = db_manager.get_all_databases()
+            if not success:
+                self.display.print_step_failure(
+                    "Database", f"Failed to get databases: {databases}"
+                )
+                return False
 
-        self.display.print_progress_database(self.app.database_manager.db_name)
+            database = self.display.prompt_select_database(databases)
+            if not database:
+                return False
+
+            db_manager.db_name = database
+
+        self.display.print_progress_database(db_manager.db_name)
+        return True
 
     def find_settings_file(self, project_path: Path) -> Tuple[bool, Optional[Path]]:
         """
@@ -176,25 +226,20 @@ class ConfigureDatabaseManager:
             project_path / project_path.name / "settings.py",
         ]
 
-        # Check each pattern
+        # Check each pattern using a fast path-first approach
         for settings_path in settings_patterns:
             if settings_path.exists() and settings_path.is_file():
                 return True, settings_path
 
-        # If no common pattern matches, do a more thorough search (limited depth)
+        # If no common pattern matches, do a more targeted search with validation
+        django_markers = ["DJANGO_SETTINGS_MODULE", "SECRET_KEY", "INSTALLED_APPS"]
+
         try:
-            # Search for settings.py files (limit to 3 levels deep to avoid excessive searching)
+            # Search for settings.py files with limited results
             for settings_file in list(project_path.glob("**/settings.py"))[:5]:
-                # Verify it's a Django settings file by checking content
+                # Only read files that might be Django settings
                 content = settings_file.read_text(encoding="utf-8", errors="ignore")
-                if any(
-                    marker in content
-                    for marker in [
-                        "DJANGO_SETTINGS_MODULE",
-                        "SECRET_KEY",
-                        "INSTALLED_APPS",
-                    ]
-                ):
+                if any(marker in content for marker in django_markers):
                     return True, settings_file
         except Exception:
             # Handle potential errors during file reading

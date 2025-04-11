@@ -231,3 +231,25 @@ class UnixOSManager(BaseOSManager):
                 
         except Exception as e:
             return False, f"Error reloading systemd daemon: {str(e)}"
+            
+    def user_exists(self, username: str) -> bool:
+        """
+        Check if a system user exists.
+        
+        Args:
+            username: Username to check
+            
+        Returns:
+            bool: True if user exists, False otherwise
+        """
+        try:
+            # Try to get user info using id command
+            result = subprocess.run(
+                ["id", username],
+                capture_output=True,
+                text=True,
+            )
+            return result.returncode == 0
+        except Exception:
+            # If any error occurs, assume user doesn't exist
+            return False

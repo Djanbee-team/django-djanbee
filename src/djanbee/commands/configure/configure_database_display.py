@@ -120,3 +120,6 @@ class ConfigureDatabaseDisplay:
 
     def print_progress_database(self, db_name):
         self.console_manager.print_input(f"Set database as {db_name}")
+
+    def progress_install_database(self):
+        self.console_manager.print_progress(f"Installing database")
