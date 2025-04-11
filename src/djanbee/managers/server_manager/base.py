@@ -78,3 +78,17 @@ class BaseServerManager(ABC):
             Tuple of (success, message or config_path)
         """
         pass
+    @abstractmethod
+    def check_default_site_exists(self) -> bool:
+        """Check if default site exists in sites-enabled."""
+        pass
+    
+    @abstractmethod
+    def remove_default_site(self) -> Tuple[bool, str]:
+        """Remove the default site from sites-enabled."""
+        pass
+    
+    @abstractmethod
+    def test_configuration(self) -> Tuple[bool, str]:
+        """Test the Nginx configuration."""
+        pass

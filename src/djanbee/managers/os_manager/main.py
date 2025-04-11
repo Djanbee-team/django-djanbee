@@ -56,6 +56,9 @@ class OSManager:
     def check_service_status(self, service_name: str) -> bool:
         """Checks if a system service is running"""
         return self._manager.check_service_status(service_name)
+    
+    def check_directory_exists(self, dir_path: str) -> bool:
+       return self._manager.check_directory_exists(dir_path)
 
     def install_package(self, package_name: str) -> Tuple[bool, str]:
         """Installs a system package using appropriate package manager"""
@@ -277,3 +280,6 @@ class OSManager:
 
     def is_venv_directory(self, path: Path) -> bool:
         self._manager.is_venv_directory(path)
+    
+    def reload_daemon(self) -> Tuple[bool, str]:
+        return self._manager.reload_daemon()
