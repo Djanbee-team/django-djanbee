@@ -37,7 +37,26 @@ class ConsoleManager:
 
     def print_warning_critical(self, text: str):
         error_msg = Text(text, style="bold red")
-        self.console.print(Panel(error_msg, box=box.DOUBLE))
+        # Add a blank line before for margin
+        self.console.print("")
+
+        self.console.print(Panel(
+            f"⛔ {text}",
+            box=box.HEAVY,  # Heavy border
+            border_style="red",  # Green border
+            style="bold #F88379",  # Bold green text 
+            padding=(1, 1),  # Minimal padding
+            highlight=True  # Enable automatic highlighting of paths
+        ))
+        # Add a blank line after for margin
+        self.console.print("")
+
+    def print_warning(self, text: str):
+        """Print warning message with warning emoji and yellow text"""
+        # Create warning text with emoji
+        text = f"⚠️  {text}"
+        # Print in yellow without a panel
+        self.console.print(text, style="yellow", highlight=True)
 
     def print_success(self, text: str):
         """Print success message with thumbs up icon and green text in a panel with highlighted paths"""

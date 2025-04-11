@@ -68,3 +68,17 @@ class BaseOSManager(ABC):
     def is_venv_directory(self, path: Path) -> bool:
         """Check if a directory is a virtual environment"""
         pass
+        
+    @abstractmethod
+    def check_directory_exists(self, dir_path: str) -> bool:
+        """Check if a directory exists"""
+        pass
+        
+    @abstractmethod
+    def check_file_exists(self, file_path: Path) -> bool:
+        """Check if a file exists"""
+        pass
+
+    @abstractmethod
+    def reload_daemon(self) -> Tuple[bool, str]:
+        pass

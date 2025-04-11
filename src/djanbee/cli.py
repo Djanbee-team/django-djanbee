@@ -59,9 +59,17 @@ def deploy():
         app = AppContainer.get_instance()
         container = DeployContainer.create(app)
 
-        container.verify_packages()
-        container.set_up_socket_file()
-        container.set_up_server()
+        # If package verification fails, stop the deployment process
+        if not container.verify_packages():
+            return
+        
+        # If setting up socket file fails, stop the deployment process
+        if not container.set_up_socket_file():
+            return
+        
+        # If setting up server configuration fails, stop the deployment process
+        if not container.set_up_server():
+            return
     except Exception as e:
         print(f"Error {e}")
 

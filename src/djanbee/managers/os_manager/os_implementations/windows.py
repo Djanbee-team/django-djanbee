@@ -60,7 +60,7 @@ class WindowsOSManager(BaseOSManager):
             result = subprocess.run(
                 ["sc", "start", service_name], capture_output=True, text=True
             )
-            return (
+            return True, (
                 "START_PENDING" in result.stdout or "RUNNING" in result.stdout,
                 result.stdout,
             )
@@ -143,3 +143,18 @@ class WindowsOSManager(BaseOSManager):
         scripts_exists = (path / "Scripts").exists()
         python_exists = (path / "Scripts" / "python.exe").exists()
         return cfg_exists and scripts_exists and python_exists
+        
+    def check_directory_exists(self, dir_path: str) -> bool:
+        """Check if a directory exists"""
+        try:
+            path = Path(dir_path)
+            return path.exists() and path.is_dir()
+        except Exception:
+            return False
+            
+    def check_file_exists(self, file_path: Path) -> bool:
+        """Check if a file exists"""
+        try:
+            return file_path.exists() and file_path.is_file()
+        except Exception:
+            return False

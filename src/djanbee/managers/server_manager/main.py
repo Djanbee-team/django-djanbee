@@ -118,3 +118,16 @@ class ServerManager:
         return self._manager.create_server_config(
             project_path, project_name, server_name, socket_path, use_sudo
         )
+
+
+    def check_default_site_exists(self) -> bool:
+        """Check if default site exists in sites-enabled."""
+        return self._manager.check_default_site_exists()
+
+    def remove_default_site(self) -> Tuple[bool, str]:
+        """Remove the default site from sites-enabled."""
+        return self._manager.remove_default_site()
+
+    def test_configuration(self) -> Tuple[bool, str]:
+        """Test the Nginx configuration."""
+        return self._manager.test_configuration()

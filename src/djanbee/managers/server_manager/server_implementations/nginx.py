@@ -349,3 +349,18 @@ class NginxServerManager(BaseServerManager):
 
         except Exception as e:
             return False, f"Error configuring static file settings: {str(e)}"
+
+    def check_default_site_exists(self) -> bool:
+        """Check if default site exists in sites-enabled."""
+        default_config_path = Path("/etc/nginx/sites-enabled/default")
+        return self.os_manager.check_file_exists(default_config_path)
+
+    def remove_default_site(self) -> Tuple[bool, str]:
+        """Remove the default site from sites-enabled."""
+        default_config_path = Path("/etc/nginx/sites-enabled/default")
+        return self.os_manager.run_command(["sudo", "rm", str(default_config_path)])
+
+    def test_configuration(self) -> Tuple[bool, str]:
+        """Test the Nginx configuration."""
+        return self.os_manager.run_command(["sudo", "nginx", "-t"])
+

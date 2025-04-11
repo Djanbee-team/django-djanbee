@@ -195,3 +195,39 @@ class UnixOSManager(BaseOSManager):
         bin_exists = (path / "bin").exists()
         python_exists = (path / "bin" / "python").exists()
         return cfg_exists and bin_exists and python_exists
+        
+    def check_directory_exists(self, dir_path: str) -> bool:
+        """Check if a directory exists"""
+        try:
+            path = Path(dir_path)
+            return path.exists() and path.is_dir()
+        except Exception:
+            return False
+            
+    def check_file_exists(self, file_path: Path) -> bool:
+        """Check if a file exists"""
+        try:
+            return file_path.exists() and file_path.is_file()
+        except Exception:
+            return False
+
+    def reload_daemon(self) -> Tuple[bool, str]:
+        """
+        Reloads the systemd daemon to recognize new or changed service files
+        
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            result = subprocess.run(
+                ["sudo", "systemctl", "daemon-reload"],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                return True, "Systemd daemon reloaded successfully"
+            else:
+                return False, f"Failed to reload systemd daemon: {result.stderr.strip()}"
+                
+        except Exception as e:
+            return False, f"Error reloading systemd daemon: {str(e)}"
