@@ -69,7 +69,7 @@ class DatabasesHandler:
         """Check for and install missing PostgreSQL dependencies."""
         # Access the env_manager through the django_manager when needed
         env_manager = self._get_env_manager()
-        
+
         if not env_manager:
             # Fallback to old method if env_manager not available
             all_installed, missing_packages = (
@@ -81,7 +81,7 @@ class DatabasesHandler:
                 venv_path, self.postgres_dependencies
             )
             all_installed = len(missing_packages) == 0
-        
+
         if not all_installed:
             self._install_missing_dependencies(venv_path, missing_packages)
         else:
@@ -92,7 +92,7 @@ class DatabasesHandler:
         result = self.display.prompt_install_database_dependencies(missing_packages)
         if result:
             self.display.print_progress_database_dependencies_install()
-            
+
             env_manager = self._get_env_manager()
             if env_manager:
                 # Use new method with env_manager
@@ -102,17 +102,21 @@ class DatabasesHandler:
             else:
                 # Fallback to old method
                 success, message = (
-                    self.settings_service.os_manager.ensure_postgres_dependencies(venv_path)
+                    self.settings_service.os_manager.ensure_postgres_dependencies(
+                        venv_path
+                    )
                 )
-                
+
             print(message)
-            
+
     def _get_env_manager(self):
         """Safely get the env_manager, handling potential circular references"""
         try:
-            if (hasattr(self.settings_service, 'django_manager') and 
-                self.settings_service.django_manager and 
-                hasattr(self.settings_service.django_manager, 'env_manager')):
+            if (
+                hasattr(self.settings_service, "django_manager")
+                and self.settings_service.django_manager
+                and hasattr(self.settings_service.django_manager, "env_manager")
+            ):
                 return self.settings_service.django_manager.env_manager
         except Exception:
             # If any error occurs, return None to use fallback method
@@ -152,7 +156,9 @@ class DatabasesHandler:
         start_match = re.search(r"DATABASES\s*=\s*{", content)
         if not start_match:
             # DATABASES not found, append it to the end of the file
-            new_content = f"{content}\n\n# Added by Django Manager\nDATABASES = {formatted_databases}\n"
+            new_content = (
+                f"{content}\n\n# Added by Djanbee\nDATABASES = {formatted_databases}\n"
+            )
             settings_path.write_text(new_content)
             return True, "DATABASES setting added successfully"
 

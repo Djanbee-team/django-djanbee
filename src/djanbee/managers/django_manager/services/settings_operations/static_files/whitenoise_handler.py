@@ -97,7 +97,6 @@ class WhiteNoiseHandler(StaticFilesHandler):
         )
 
         is_whitenoise = self.is_whitenoise_properly_configured(middleware_list)
-
         if not is_whitenoise:
             middleware_list = self.setup_whitenoise_middleware(middleware_list)
             self.display.print_progress_whitenoise()
