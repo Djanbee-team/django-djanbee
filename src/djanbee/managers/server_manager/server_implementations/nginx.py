@@ -282,7 +282,6 @@ class NginxServerManager(BaseServerManager):
 
             # Reload Nginx to apply changes
             reload_success, reload_message = self.restart_server()
-            print("HERE")
             self.configure_django_static_settings(project_name)
             if not reload_success:
                 return False, f"Failed to reload Nginx: {reload_message}"

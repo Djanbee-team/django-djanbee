@@ -8,6 +8,7 @@ from ..managers import (
     ServerManager,
     SocketManager,
     EnvManager,
+    DotenvManager,
 )
 
 
@@ -22,6 +23,7 @@ class AppContainer:
     server_manager: "ServerManager"
     socket_manager: "SocketManager"
     env_manager: "EnvManager"
+    dotenv_manager: "DotenvManager"
 
     _instance: Optional["AppContainer"] = None
 
@@ -34,8 +36,11 @@ class AppContainer:
             # Create the environment manager first
             env_manager = EnvManager(os_manager, console_manager)
             
-            # Pass env_manager to django_manager
-            django_manager = DjangoManager(os_manager, console_manager, env_manager)
+            # Create dotenv manager
+            dotenv_manager = DotenvManager(os_manager, console_manager)
+            
+            # Pass env_manager and dotenv_manager to django_manager
+            django_manager = DjangoManager(os_manager, console_manager, env_manager, dotenv_manager)
             
             cls._instance = cls(
                 os_manager=os_manager,
@@ -49,5 +54,6 @@ class AppContainer:
                     os_manager, console_manager, django_manager
                 ),
                 env_manager=env_manager,
+                dotenv_manager=dotenv_manager,
             )
         return cls._instance
