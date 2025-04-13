@@ -11,7 +11,12 @@ Result = namedtuple("Result", ["valid", "object"])
 class DjangoSettingsService:
     """Service for managing Django settings"""
 
-    def __init__(self, os_manager: OSManager, display: DjangoSettingsServiceDisplay, django_manager=None):
+    def __init__(
+        self,
+        os_manager: OSManager,
+        display: DjangoSettingsServiceDisplay,
+        django_manager=None,
+    ):
         self.os_manager = os_manager
         self.state = DjangoManagerState.get_instance()
         self.display = display
@@ -31,13 +36,13 @@ class DjangoSettingsService:
     def get_settings_path(self):
         """
         Get the settings path, using cached value if available or finding it if not.
-        
+
         Returns:
             Path: Path to the settings.py file or None if not found
         """
         if self.state.settings_path and self.state.settings_path.exists():
             return self.state.settings_path
-            
+
         self.state.settings_path = self.find_settings_file()
         return self.state.settings_path
 
@@ -73,7 +78,7 @@ class DjangoSettingsService:
         manage_path = self.state.current_project_path / "manage.py"
         if manage_path.exists():
             content = manage_path.read_text()
-            
+
             # Look for DJANGO_SETTINGS_MODULE pattern
             settings_module_match = re.search(
                 r'DJANGO_SETTINGS_MODULE["\']?\s*,\s*["\']([^"\']+)["\']', content
@@ -105,14 +110,14 @@ class DjangoSettingsService:
 
     def _read_settings_file(self):
         """Utility method to read settings file content
-        
+
         Returns:
             tuple: (bool success, str content or error message, Path settings_path)
         """
         settings_path = self.get_settings_path()
         if not settings_path or not settings_path.exists():
             return False, "Settings file not found", None
-        
+
         try:
             content = settings_path.read_text()
             return True, content, settings_path
@@ -121,7 +126,7 @@ class DjangoSettingsService:
 
     def _write_settings_file(self, settings_path, content):
         """Utility method to write settings file content
-        
+
         Returns:
             tuple: (bool success, str message)
         """
@@ -145,7 +150,7 @@ class DjangoSettingsService:
         settings_path = self.get_settings_path()
         if not settings_path:
             return default
-        
+
         # Create a temporary module to execute the settings file
         import importlib.util
         import sys
@@ -242,7 +247,7 @@ class DjangoSettingsService:
                     updated = True
                 else:
                     # Setting not found, append it to the end of the file
-                    new_content = f"{content}\n\n# Added by Django Manager\n{setting_name} = {value_str}\n"
+                    new_content = f"{content}\n\n# Added by Djanbee\n{setting_name} = {value_str}\n"
                     updated = True
 
         # Write the updated content back to the file
@@ -400,27 +405,22 @@ class DjangoSettingsService:
         Returns:
             tuple: (bool success, str message)
         """
+        import re
         from pprint import pformat
+
+        # Format the middleware list with proper indentation
         formatted_middleware = pformat(new_middleware, indent=4)
-        
-        # Try simple setting first 
-        result = self.edit_settings("MIDDLEWARE", new_middleware)
-        # If result is a tuple, unpack it
-        success = result[0] if isinstance(result, tuple) else result
-        
-        if success:
-            return True, "MIDDLEWARE setting updated successfully"
-        
-        # If simple edit fails, use more complex approach to handle list brackets
+
+        # Read the Django settings file
         success, content, settings_path = self._read_settings_file()
         if not success:
             return False, content
 
-        # First look for the start of the MIDDLEWARE assignment
+        # Look for the start of the MIDDLEWARE assignment
         start_match = re.search(r"MIDDLEWARE\s*=\s*\[", content)
         if not start_match:
             # MIDDLEWARE not found, append it to the end of the file
-            new_content = f"{content}\n\n# Added by Django Manager\nMIDDLEWARE = {formatted_middleware}\n"
+            new_content = f"{content}\n\n# Added by Djanbee\nMIDDLEWARE = {formatted_middleware}\n"
             return self._write_settings_file(settings_path, new_content)
 
         # Find the entire MIDDLEWARE block by tracking brackets
@@ -450,80 +450,79 @@ class DjangoSettingsService:
         # Replace the entire MIDDLEWARE block with the new configuration
         new_content = (
             content[:start_pos]
-            + f"MIDDLEWARE = {str(formatted_middleware)}"
+            + f"MIDDLEWARE = {formatted_middleware}"
             + content[end_pos:]
         )
 
         # Write the updated content back to the file
         return self._write_settings_file(settings_path, new_content)
-    
 
     def delete_setting(self, setting_name):
         """
         Delete a setting from the Django settings file, including associated comments
         and empty lines.
-        
+
         Args:
             setting_name (str): The name of the setting to delete
-            
+
         Returns:
             tuple: (bool success, str message)
         """
         success, content, settings_path = self._read_settings_file()
         if not success:
             return False, content
-        
+
         # Split content into lines for more precise handling
-        lines = content.split('\n')
+        lines = content.split("\n")
         new_lines = []
-        
+
         # Variables to track state
         setting_found = False
         skip_next_empty = False
         i = 0
-        
+
         while i < len(lines):
             line = lines[i]
-            
+
             # Check if this line contains the setting
             if re.match(rf"\s*{setting_name}\s*=", line):
                 setting_found = True
                 skip_next_empty = True
-                
+
                 # Look backward for comments and empty lines
                 j = len(new_lines) - 1
-                
+
                 # Skip immediately preceding empty lines
-                while j >= 0 and new_lines[j].strip() == '':
+                while j >= 0 and new_lines[j].strip() == "":
                     j -= 1
-                
-                # Skip immediately preceding comments (especially those added by Django Manager)
-                while j >= 0 and new_lines[j].strip().startswith('#'):
+
+                # Skip immediately preceding comments (especially those added by Djanbee)
+                while j >= 0 and new_lines[j].strip().startswith("#"):
                     j -= 1
-                
+
                 # Keep only lines up to j
-                new_lines = new_lines[:j+1]
-                
+                new_lines = new_lines[: j + 1]
+
                 # Skip this line (the setting line)
                 i += 1
                 continue
-            
+
             # Skip empty line after setting if needed
-            if skip_next_empty and line.strip() == '':
+            if skip_next_empty and line.strip() == "":
                 skip_next_empty = False
                 i += 1
                 continue
-            
+
             # Keep all other lines
             new_lines.append(line)
             i += 1
-        
+
         if not setting_found:
             return True, f"Setting {setting_name} not found, nothing to delete"
-        
+
         try:
             # Join lines back into content and write to file
-            new_content = '\n'.join(new_lines)
+            new_content = "\n".join(new_lines)
             return self._write_settings_file(settings_path, new_content)
         except Exception as e:
             return False, f"Error deleting setting {setting_name}: {str(e)}"
