@@ -112,7 +112,7 @@ class SecretKeyHandler:
                     self.settings_service._write_settings_file(settings_path, new_content)
         
         # Update SECRET_KEY in settings to use environment variable
-        success = self.settings_service.edit_settings("SECRET_KEY", "os.environ.get('SECRET_KEY')")
+        success = self.settings_service.replace_settings("SECRET_KEY", "os.environ.get('SECRET_KEY')")
         if success:
             self.display.success_set_secret_key()
             self.display.console_manager.print_success("SECRET_KEY now loaded from environment variable")
