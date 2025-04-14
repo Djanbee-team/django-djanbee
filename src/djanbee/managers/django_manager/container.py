@@ -1,5 +1,6 @@
 from ..os_manager import OSManager
 from ..console_manager import ConsoleManager
+from ..dotenv_manager import DotenvManager
 from .services.venv_service import DjangoEnvironmentService
 from .services.project_service import DjangoProjectService
 from .services.project_service_display import DjangoProjectServiceDisplay
@@ -35,11 +36,12 @@ from .state import DjangoManagerState
 class DjangoManager:
     """Container for Django-related services with lazy loading"""
 
-    def __init__(self, os_manager: OSManager, console_manager: ConsoleManager, env_manager=None):
+    def __init__(self, os_manager: OSManager, console_manager: ConsoleManager, env_manager=None, dotenv_manager=None):
         """Initialize the Django manager with dependencies but not services"""
         self.os_manager = os_manager
         self.console_manager = console_manager
         self.env_manager = env_manager
+        self.dotenv_manager = dotenv_manager
 
         # Initialize service placeholders
         self._project_service = None
@@ -113,7 +115,9 @@ class DjangoManager:
         """Lazy load the secret key handler"""
         if self._secret_key_handler is None:
             self._secret_key_handler = SecretKeyHandler(
-                self.settings_service, SecretKeyHandlerDisplay(self.console_manager)
+                self.settings_service, 
+                SecretKeyHandlerDisplay(self.console_manager),
+                self.dotenv_manager
             )
         return self._secret_key_handler
 
