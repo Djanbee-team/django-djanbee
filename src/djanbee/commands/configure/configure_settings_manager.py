@@ -14,12 +14,16 @@ class ConfigureSettingsManager:
     def _configure_settings(self, path="") -> Optional[tuple]:
         """Handle searching for Django projects in subdirectories"""
         # Find and validate project
+
         if not self.app.django_manager.project_service.state.current_project_path:
             project = self.app.django_manager.project_service.select_project()
+        else:
+            project = self.app.django_manager.project_service.state.current_project_path
         if not project:
             return None
 
         # Find settings file
+
         settings_file = self.app.django_manager.settings_service.find_settings()
 
         # Get user's configuration choices
