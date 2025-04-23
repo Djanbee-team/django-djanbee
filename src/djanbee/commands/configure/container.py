@@ -42,15 +42,14 @@ class ConfigureContainer:
     ) -> None:
         # Convert boolean flags to steps internally
         steps = set()
-        if database:
-            steps.add(ConfigStep.DATABASE)
         if settings:
             steps.add(ConfigStep.SETTINGS)
+        if database:
+            steps.add(ConfigStep.DATABASE)
 
         # If no specific steps selected, use ALL
         if not steps:
             steps = {ConfigStep.ALL}
-
         if ConfigStep.ALL in steps:
             self._configure_all(path)
         else:

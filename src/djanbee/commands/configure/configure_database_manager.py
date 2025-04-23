@@ -123,14 +123,14 @@ class ConfigureDatabaseManager:
         success, message = db_manager.configure_postgres_service()
         if not success:
             self.display.error_database_running()
-            self.display.print_step_failure("Service", message)
+            self.display.console_manager.print_step_failure("Service", message)
             return False
 
         # Verify service is running
         is_running = db_manager.check_postgres_status()
         if not is_running:
             self.display.error_database_running()
-            self.display.print_step_failure(
+            self.display.console_manager.print_step_failure(
                 "Service", "Service enabled but not running"
             )
 
@@ -171,7 +171,7 @@ class ConfigureDatabaseManager:
             db_name = self.display.input_database_name()
             success, message = db_manager.create_database(db_name)
             if not success:
-                self.display.print_step_failure(
+                self.display.console_manager.print_step_failure(
                     "Database", f"Failed to create database: {message}"
                 )
                 return False
@@ -179,7 +179,7 @@ class ConfigureDatabaseManager:
             # Connect to existing database
             success, databases = db_manager.get_all_databases()
             if not success:
-                self.display.print_step_failure(
+                self.display.console_manager.print_step_failure(
                     "Database", f"Failed to get databases: {databases}"
                 )
                 return False
