@@ -19,22 +19,6 @@ class OSManager:
         else:
             self._manager = UnixOSManager()
 
-    def set_dir(self, dir: str | Path = "."):
-        """Sets OS directory"""
-        try:
-            dir_path = Path(dir)
-
-            if not dir_path.exists():
-                raise FileNotFoundError(f"Directory does not exist: {dir_path}")
-            if not dir_path.is_dir():
-                raise NotADirectoryError(f"Path is not a directory: {dir_path}")
-
-            # Changes directory
-            os.chdir(dir_path)
-
-        except Exception as e:
-            raise Exception(f"Failed to set directory: {str(e)}")
-
     def get_dir(self) -> Path:
         """Returns current working directory"""
         return self._manager.get_dir()
@@ -56,9 +40,6 @@ class OSManager:
     def check_service_status(self, service_name: str) -> bool:
         """Checks if a system service is running"""
         return self._manager.check_service_status(service_name)
-    
-    def check_directory_exists(self, dir_path: str) -> bool:
-       return self._manager.check_directory_exists(dir_path)
 
     def install_package(self, package_name: str) -> Tuple[bool, str]:
         """Installs a system package using appropriate package manager"""
@@ -83,6 +64,10 @@ class OSManager:
     def run_command(self, command: str | List[str]) -> Tuple[bool, str]:
         """Runs a system command"""
         return self._manager.run_command(command)
+    
+    def run_python_command(self, command_args: List[str]) -> Tuple[bool, str]:
+        """Runs a Python command using the system's Python version"""
+        return self._manager.run_python_command(command_args)
 
     def get_username(self) -> str:
         """Gets current user's username"""
@@ -91,6 +76,49 @@ class OSManager:
     def is_admin(self) -> bool:
         """Checks if current user has admin privileges"""
         return self._manager.is_admin()
+
+    def is_venv_directory(self, path: Path) -> bool:
+        return self._manager.is_venv_directory(path)
+        
+    def check_directory_exists(self, dir_path: str) -> bool:
+       return self._manager.check_directory_exists(dir_path)
+        
+    def check_file_exists(self, path: Path) -> bool:
+        """Check if a file exists"""
+        return path.exists() and path.is_file()
+
+    def reload_daemon(self) -> Tuple[bool, str]:
+        """Reload system daemon"""
+        return self._manager.reload_daemon()
+        
+    def user_exists(self, username: str) -> bool:
+        """
+        Check if a system user exists.
+        
+        Args:
+            username: Username to check
+            
+        Returns:
+            bool: True if user exists, False otherwise
+        """
+        return self._manager.user_exists(username)
+
+    # Additional methods specific to OSManager that aren't in BaseOSManager
+    def set_dir(self, dir: str | Path = "."):
+        """Sets OS directory"""
+        try:
+            dir_path = Path(dir)
+
+            if not dir_path.exists():
+                raise FileNotFoundError(f"Directory does not exist: {dir_path}")
+            if not dir_path.is_dir():
+                raise NotADirectoryError(f"Path is not a directory: {dir_path}")
+
+            # Changes directory
+            os.chdir(dir_path)
+
+        except Exception as e:
+            raise Exception(f"Failed to set directory: {str(e)}")
 
     def get_path_basename(self, path: str | Path) -> str:
         """Get the basename (final component) of a path"""
@@ -164,10 +192,6 @@ class OSManager:
             return False, f"Failed to run pip command: {e.stderr}"
         except Exception as e:
             return False, f"Error running pip command: {str(e)}"
-
-    def check_file_exists(self, path: Path) -> bool:
-        """Check if a file exists"""
-        return path.exists() and path.is_file()
 
     def write_text_file(
         self, path: Path, content: str, use_sudo: bool = False
@@ -277,22 +301,3 @@ class OSManager:
                 return False, f"Error installing {package}: {str(e)}"
 
         return True, "PostgreSQL dependencies were successfully installed"
-
-    def is_venv_directory(self, path: Path) -> bool:
-        self._manager.is_venv_directory(path)
-    
-    def reload_daemon(self) -> Tuple[bool, str]:
-        """Reload system daemon"""
-        return self._manager.reload_daemon()
-        
-    def user_exists(self, username: str) -> bool:
-        """
-        Check if a system user exists.
-        
-        Args:
-            username: Username to check
-            
-        Returns:
-            bool: True if user exists, False otherwise
-        """
-        return self._manager.user_exists(username)

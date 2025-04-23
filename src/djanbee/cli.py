@@ -4,6 +4,7 @@ from .commands import (
     SetupContainer,
     ConfigureContainer,
     DeployContainer,
+    RunContainer
 )
 from .core import AppContainer
 
@@ -70,6 +71,18 @@ def deploy():
         # If setting up server configuration fails, stop the deployment process
         if not container.set_up_server():
             return
+    except Exception as e:
+        print(f"Error {e}")
+
+@cli.command()
+@click.argument("path", default="")
+def run(path: str):
+    try:
+        app = AppContainer.get_instance()
+        container = RunContainer.create(app)
+        
+        container.run_django_setup(path)
+
     except Exception as e:
         print(f"Error {e}")
 

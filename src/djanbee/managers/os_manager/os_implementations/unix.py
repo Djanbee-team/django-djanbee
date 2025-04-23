@@ -173,6 +173,34 @@ class UnixOSManager(BaseOSManager):
 
         except Exception as e:
             return False, str(e)
+        
+    def run_python_command(self, command_args: List[str]) -> Tuple[bool, str]:
+        """
+        Runs a Python command using the system's Python version
+        
+        Args:
+            command_args: Arguments to pass to Python (excluding the Python command itself)
+            
+        Returns:
+            Tuple of (success, output/error message)
+        """
+        try:
+            # Determine the Python executable to use
+            python_exec_result = self.run_command("which python3 || which python")
+            
+            if not python_exec_result[0]:
+                return False, "Could not find Python executable"
+                
+            python_exec = python_exec_result[1]
+            
+            # Build the full command with the determined Python executable
+            full_command = [python_exec] + command_args
+            
+            # Use the existing run_command method to execute
+            return self.run_command(full_command)
+                
+        except Exception as e:
+            return False, f"Error running Python command: {str(e)}"
 
     def get_username(self) -> str:
         """Gets current user's username"""
