@@ -15,6 +15,16 @@ class BaseOSManager(ABC):
         pass
 
     @abstractmethod
+    def check_pip_package_installed(self, package_name: str) -> bool:
+        """Checks if a Python package is installed via pip"""
+        pass
+
+    @abstractmethod
+    def install_pip_package(self, package_name: str) -> Tuple[bool, str]:
+        """Installs a Python package via pip"""
+        pass
+
+    @abstractmethod
     def check_package_installed(self, package_name: str) -> bool:
         """Checks if a system package is installed"""
         pass
@@ -52,6 +62,11 @@ class BaseOSManager(ABC):
     @abstractmethod
     def run_command(self, command: str | List[str]) -> Tuple[bool, str]:
         """Runs a system command"""
+        pass
+        
+    @abstractmethod
+    def run_python_command(self, command_args: List[str]) -> Tuple[bool, str]:
+        """Runs a Python command using the system's Python version"""
         pass
 
     @abstractmethod
