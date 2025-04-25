@@ -23,6 +23,14 @@ class ConfigureDatabaseDisplay:
             "Do you wish to install a database (postgresql)", self.console_manager
         )
         return selector.select()
+    
+    def prompt_set_default_config(self):
+        selector = QuestionSelector(
+            "Do you wish to generate database config for a local postgresql database",
+            self.console_manager,
+            warning="Peer connection only!!! (for now)",
+        )
+        return selector.select()
 
     def prompt_enable_database(self):
         selector = QuestionSelector(
@@ -123,3 +131,27 @@ class ConfigureDatabaseDisplay:
 
     def progress_install_database(self):
         self.console_manager.print_progress(f"Installing database")
+
+    def show_permissions_setup(self, username):
+        """Display information about setting up permissions."""
+        self.console_manager.print_info(f"Setting up database permissions for {username}")
+
+    def show_permissions_success(self):
+        """Display success message for permissions setup."""
+        self.console_manager.print_success("Database permissions configured successfully")
+
+    def show_permissions_error(self):
+        """Display error message for permissions setup."""
+        self.console_manager.print_error("Failed to configure database permissions")
+
+    def show_config_update(self):
+        """Display information about updating database config."""
+        self.console_manager.print_info("Updating database configuration for peer authentication")
+
+    def show_config_success(self):
+        """Display success message for config update."""
+        self.console_manager.print_success("Database configuration updated successfully")
+
+    def show_config_error(self):
+        """Display error message for config update."""
+        self.console_manager.print_error("Failed to update database configuration")

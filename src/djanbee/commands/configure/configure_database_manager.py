@@ -191,7 +191,81 @@ class ConfigureDatabaseManager:
             db_manager.db_name = database
 
         self.display.print_progress_database(db_manager.db_name)
+        if self.display.prompt_set_default_config():
+            
+            self._update_database_configuration(db_manager.db_name)
         return True
+    
+    def _update_database_configuration(self, db_name):
+        """Handle updating the database configuration in settings and grant permissions."""
+        # Get current project path
+        if not self.app.django_manager.project_service.state.current_project_path:
+            project = self.app.django_manager.project_service.select_project()
+        else:
+            project = self.app.django_manager.project_service.state.current_project_path
+        if not project:
+            return False
+
+        # Get the current user
+        current_user = self.app.os_manager.get_username()
+        
+        # Setup permissions
+        self.display.show_permissions_setup(current_user)
+        
+        # 1. Make user the database owner
+        owner_success, _ = self.app.database_manager.execute_admin_command(
+            f"ALTER DATABASE {db_name} OWNER TO {current_user};"
+        )
+        
+        # 2. Grant schema permissions
+        schema_cmd = f'sudo -u postgres psql -d {db_name} -c "GRANT ALL ON SCHEMA public TO {current_user}; ALTER SCHEMA public OWNER TO {current_user};"'
+        schema_success, _ = self.app.os_manager.run_command(schema_cmd)
+        
+        # Report permissions result
+        if owner_success and schema_success:
+            self.display.show_permissions_success()
+        else:
+            self.display.show_permissions_error()
+        
+        # Update configuration
+        self.display.show_config_update()
+        
+        # Create peer authentication configuration
+        db_config = {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": db_name,
+            "USER": current_user,
+            "PASSWORD": "",  # Empty for peer authentication
+            "HOST": "",      # Empty for peer authentication
+            "PORT": "",      # Empty for default port
+        }
+        
+        # Wrap the updated database configuration
+        updated_database_config = {"default": db_config}
+        
+        # Update the settings file
+        success = self.app.django_manager.databases_handler.edit_database_settings(updated_database_config)
+        
+        # Report configuration result
+        if success:
+            self.display.show_config_success()
+        else:
+            self.display.show_config_error()
+        
+        return success
+
+def grant_database_permissions(self, db_name, username):
+    """Grant all necessary permissions for the user on the database."""
+    # 1. Make user the database owner
+    owner_success, _ = self.app.database_manager.execute_admin_command(
+        f"ALTER DATABASE {db_name} OWNER TO {username};"
+    )
+    
+    # 2. Grant schema permissions
+    schema_cmd = f'sudo -u postgres psql -d {db_name} -c "GRANT ALL ON SCHEMA public TO {username}; ALTER SCHEMA public OWNER TO {username};"'
+    schema_success, _ = self.app.os_manager.run_command(schema_cmd)
+    
+    return owner_success and schema_success
 
     def find_settings_file(self, project_path: Path) -> Tuple[bool, Optional[Path]]:
         """

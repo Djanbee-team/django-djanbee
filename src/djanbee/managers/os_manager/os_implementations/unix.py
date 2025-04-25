@@ -165,7 +165,6 @@ class UnixOSManager(BaseOSManager):
                 command_list = command
 
             result = subprocess.run(command_list, capture_output=True, text=True)
-
             if result.returncode == 0:
                 return True, result.stdout.strip()
             else:
@@ -185,13 +184,18 @@ class UnixOSManager(BaseOSManager):
             Tuple of (success, output/error message)
         """
         try:
-            # Determine the Python executable to use
-            python_exec_result = self.run_command("which python3 || which python")
+            # Determine the Python executable to use (try python3 first, then python)
+            python3_result = self.run_command(["which", "python3"])
             
-            if not python_exec_result[0]:
-                return False, "Could not find Python executable"
-                
-            python_exec = python_exec_result[1]
+            if python3_result[0]:
+                python_exec = python3_result[1].strip()
+            else:
+                # If python3 not found, try python
+                python_result = self.run_command(["which", "python"])
+                if python_result[0]:
+                    python_exec = python_result[1].strip()
+                else:
+                    return False, "Could not find Python executable"
             
             # Build the full command with the determined Python executable
             full_command = [python_exec] + command_args
@@ -201,7 +205,7 @@ class UnixOSManager(BaseOSManager):
                 
         except Exception as e:
             return False, f"Error running Python command: {str(e)}"
-
+        
     def get_username(self) -> str:
         """Gets current user's username"""
         try:

@@ -102,11 +102,12 @@ def setup():
 
 @cli.command()
 @click.option("-s", "--settings", is_flag=True, help="Configure settings")
+@click.option("-d", "--database", is_flag=True, help="Configure database")
 @click.argument("path", default="")
-def configure( settings: bool, path: str):
+def configure( settings: bool, database: bool, path: str):
     """Configure Django project and dependencies"""
     try:
-        configure_command( settings, path)
+        configure_command(database, settings, path)
     except Exception as e:
         print(f"Error {e}")
 
