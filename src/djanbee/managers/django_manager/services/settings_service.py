@@ -31,7 +31,7 @@ class DjangoSettingsService:
             self.display.error_found_settings()
             return None
         self.display.success_found_settings(settings_file)
-        return (True, settings_file)
+        return True, settings_file
 
     def get_settings_path(self):
         """
@@ -43,7 +43,7 @@ class DjangoSettingsService:
         if self.state.settings_path and self.state.settings_path.exists():
             return self.state.settings_path
 
-        self.state.settings_path = self.find_settings_file()
+        result, self.state.settings_path = self.find_settings()
         return self.state.settings_path
 
     def find_settings_file(self) -> Path:
