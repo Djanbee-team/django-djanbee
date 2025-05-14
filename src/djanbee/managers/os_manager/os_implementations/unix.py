@@ -1,287 +1,145 @@
 import os
-import subprocess
+import shlex
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Union
 
 from ..base import BaseOSManager
+from ..command_runner import CommandRunner, CommandResult
 
 
 class UnixOSManager(BaseOSManager):
+    def __init__(self, runner: CommandRunner):
+        super().__init__(runner)
+
     def get_dir(self) -> Path:
-        """Returns current working directory"""
+        """Returns current working directory."""
         return Path.cwd().resolve()
 
     def get_pip_path(self, venv_path: Path) -> Path:
-        """Gets platform-specific pip executable path"""
+        """Gets pip executable path in a virtual environment."""
         return venv_path / "bin" / "pip"
 
-    def check_pip_package_installed(self, package_name: str) -> bool:
-        """Checks if a Python package is installed via pip"""
-        try:
-            import sys
+    def check_pip_package_installed(self, package_name: str) -> CommandResult:
+        """Checks if a Python package is installed via pip."""
+        import sys
+        return self._runner.run(
+            [sys.executable, "-m", "pip", "show", package_name]
+        )
 
-            result = subprocess.run(
-                [sys.executable, "-m", "pip", "show", package_name],
-                capture_output=True,
-                text=True,
-            )
-            return result.returncode == 0
-        except Exception:
-            return False
+    def install_pip_package(self, package_name: str) -> CommandResult:
+        """Installs a Python package via pip."""
+        import sys
+        return self._runner.run(
+            [sys.executable, "-m", "pip", "install", package_name]
+        )
 
-    def install_pip_package(self, package_name: str) -> Tuple[bool, str]:
-        """Installs a Python package via pip"""
-        try:
-            import sys
+    def check_package_installed(self, package_name: str) -> CommandResult:
+        """Checks if a system package is installed (by which)."""
+        return self._runner.run(["which", package_name])
 
-            result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", package_name],
-                capture_output=True,
-                text=True,
-            )
+    def check_service_status(self, service_name: str) -> CommandResult:
+        """Checks if a system service is running."""
+        return self._runner.run(
+            ["systemctl", "status", service_name]
+        )
 
-            if result.returncode == 0:
-                return True, f"Successfully installed {package_name}"
+    def install_package(self, package_name: str) -> CommandResult:
+        """Installs a system package using apt-get."""
+        # Update package list first
+        update_res = self._runner.run(
+            ["apt-get", "update"], sudo=True
+        )
+        if not update_res.success:
+            return update_res
+        # Then install the package
+        return self._runner.run(
+            ["apt-get", "install", "-y", package_name], sudo=True
+        )
+
+    def start_service(self, service_name: str) -> CommandResult:
+        """Starts a system service."""
+        return self._runner.run(
+            ["systemctl", "start", service_name], sudo=True
+        )
+
+    def stop_service(self, service_name: str) -> CommandResult:
+        """Stops a system service."""
+        return self._runner.run(
+            ["systemctl", "stop", service_name], sudo=True
+        )
+
+    def restart_service(self, service_name: str) -> CommandResult:
+        """Restarts a system service."""
+        return self._runner.run(
+            ["systemctl", "restart", service_name], sudo=True
+        )
+
+    def enable_service(self, service_name: str) -> CommandResult:
+        """Enables a service to start on boot."""
+        return self._runner.run(
+            ["systemctl", "enable", service_name], sudo=True
+        )
+
+    def run_command(self, command: Union[str, List[str]]) -> CommandResult:
+        """Runs a system command (string or list of args)."""
+        return self._runner.run(command)
+
+    def run_python_command(self, command_args: List[str]) -> CommandResult:
+        """Runs a Python command using the system interpreter."""
+        # Determine Python executable
+        res = self._runner.run(["which", "python3"])
+        if res.success:
+            python_exec = res.stdout
+        else:
+            res2 = self._runner.run(["which", "python"])
+            if res2.success:
+                python_exec = res2.stdout
             else:
-                return False, f"Failed to install {package_name}: {result.stderr}"
+                return CommandResult(
+                    success=False,
+                    stdout="",
+                    stderr="Could not find Python executable",
+                    exit_code=res2.exit_code,
+                )
+        return self._runner.run([python_exec] + command_args)
 
-        except Exception as e:
-            return False, f"Error installing package: {str(e)}"
-
-    def check_package_installed(self, package_name: str) -> bool:
-        """Checks if a system package is installed"""
-        try:
-            result = subprocess.run(
-                ["which", package_name], capture_output=True, text=True
-            )
-            return result.returncode == 0
-        except Exception:
-            return False
-
-    def check_service_status(self, service_name: str) -> bool:
-        """Checks if a system service is running"""
-        try:
-            result = subprocess.run(
-                ["systemctl", "status", service_name], capture_output=True, text=True
-            )
-            return result.returncode == 0
-        except Exception:
-            return False
-
-    def install_package(self, package_name: str) -> Tuple[bool, str]:
-        """Installs a system package"""
-        try:
-            # First update package list
-            update_result = subprocess.run(
-                ["sudo", "apt-get", "update"], capture_output=True, text=True
-            )
-            if update_result.returncode != 0:
-                return False, f"Failed to update package list: {update_result.stderr}"
-
-            # Then install the package
-            result = subprocess.run(
-                ["sudo", "apt-get", "install", "-y", package_name],
-                capture_output=True,
-                text=True,
-            )
-
-            if result.returncode == 0:
-                return True, f"Successfully installed {package_name}"
-            else:
-                return False, f"Failed to install {package_name}: {result.stderr}"
-
-        except Exception as e:
-            return False, f"Error installing package: {str(e)}"
-
-    def start_service(self, service_name: str) -> Tuple[bool, str]:
-        """Starts a system service"""
-        try:
-            result = subprocess.run(
-                ["sudo", "systemctl", "start", service_name],
-                capture_output=True,
-                text=True,
-            )
-            return (
-                result.returncode == 0,
-                result.stdout if result.returncode == 0 else result.stderr,
-            )
-        except Exception as e:
-            return False, str(e)
-
-    def stop_service(self, service_name: str) -> Tuple[bool, str]:
-        """Stops a system service"""
-        try:
-            result = subprocess.run(
-                ["sudo", "systemctl", "stop", service_name],
-                capture_output=True,
-                text=True,
-            )
-            return (
-                result.returncode == 0,
-                result.stdout if result.returncode == 0 else result.stderr,
-            )
-        except Exception as e:
-            return False, str(e)
-
-    def restart_service(self, service_name: str) -> Tuple[bool, str]:
-        """Restarts a system service"""
-        try:
-            result = subprocess.run(
-                ["sudo", "systemctl", "restart", service_name],
-                capture_output=True,
-                text=True,
-            )
-            return (
-                result.returncode == 0,
-                result.stdout if result.returncode == 0 else result.stderr,
-            )
-        except Exception as e:
-            return False, str(e)
-
-    def enable_service(self, service_name: str) -> Tuple[bool, str]:
-        """Enables a service to start on boot"""
-        try:
-            result = subprocess.run(
-                ["sudo", "systemctl", "enable", service_name],
-                capture_output=True,
-                text=True,
-            )
-            return (
-                result.returncode == 0,
-                result.stdout if result.returncode == 0 else result.stderr,
-            )
-        except Exception as e:
-            return False, str(e)
-
-    def run_command(self, command: str | List[str]) -> Tuple[bool, str]:
-        """Runs a system command"""
-        try:
-            # Convert string command to list if necessary
-            if isinstance(command, str):
-                import shlex
-
-                command_list = shlex.split(command)
-            else:
-                command_list = command
-
-            result = subprocess.run(command_list, capture_output=True, text=True)
-            if result.returncode == 0:
-                return True, result.stdout.strip()
-            else:
-                return False, result.stderr.strip()
-
-        except Exception as e:
-            return False, str(e)
-        
-    def run_python_command(self, command_args: List[str]) -> Tuple[bool, str]:
-        """
-        Runs a Python command using the system's Python version
-        
-        Args:
-            command_args: Arguments to pass to Python (excluding the Python command itself)
-            
-        Returns:
-            Tuple of (success, output/error message)
-        """
-        try:
-            # Determine the Python executable to use (try python3 first, then python)
-            python3_result = self.run_command(["which", "python3"])
-            
-            if python3_result[0]:
-                python_exec = python3_result[1].strip()
-            else:
-                # If python3 not found, try python
-                python_result = self.run_command(["which", "python"])
-                if python_result[0]:
-                    python_exec = python_result[1].strip()
-                else:
-                    return False, "Could not find Python executable"
-            
-            # Build the full command with the determined Python executable
-            full_command = [python_exec] + command_args
-            
-            # Use the existing run_command method to execute
-            return self.run_command(full_command)
-                
-        except Exception as e:
-            return False, f"Error running Python command: {str(e)}"
-        
     def get_username(self) -> str:
-        """Gets current user's username"""
-        try:
-            result = subprocess.run(["whoami"], capture_output=True, text=True)
-            return result.stdout.strip()
-        except Exception:
-            return ""
+        """Gets current user's username."""
+        res = self._runner.run(["whoami"])
+        return res.stdout.strip() if res.success else ""
 
     def is_admin(self) -> bool:
-        """Checks if current user has admin privileges"""
+        """Checks if current user has admin (root) privileges."""
         try:
             return os.geteuid() == 0
-        except Exception:
+        except AttributeError:
+            # os.geteuid not available on some platforms
             return False
 
     def is_venv_directory(self, path: Path) -> bool:
-        """Check if a directory is a virtual environment on Unix systems"""
-        cfg_exists = (path / "pyvenv.cfg").exists()
-        bin_exists = (path / "bin").exists()
-        python_exists = (path / "bin" / "python").exists()
-        return cfg_exists and bin_exists and python_exists
-        
-    def check_directory_exists(self, dir_path: str) -> bool:
-        """Check if a directory exists"""
-        try:
-            path = Path(dir_path)
-            return path.exists() and path.is_dir()
-        except Exception:
-            return False
-            
-    def check_file_exists(self, file_path: Path) -> bool:
-        """Check if a file exists"""
-        try:
-            return file_path.exists() and file_path.is_file()
-        except Exception:
-            return False
+        """Checks if a directory is a Python virtual environment."""
+        return (
+            (path / "pyvenv.cfg").exists()
+            and (path / "bin").is_dir()
+            and (path / "bin" / "python").exists()
+        )
 
-    def reload_daemon(self) -> Tuple[bool, str]:
-        """
-        Reloads the systemd daemon to recognize new or changed service files
-        
-        Returns:
-            Tuple of (success, message)
-        """
-        try:
-            result = subprocess.run(
-                ["sudo", "systemctl", "daemon-reload"],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode == 0:
-                return True, "Systemd daemon reloaded successfully"
-            else:
-                return False, f"Failed to reload systemd daemon: {result.stderr.strip()}"
-                
-        except Exception as e:
-            return False, f"Error reloading systemd daemon: {str(e)}"
-            
+    def check_directory_exists(self, dir_path: Union[str, Path]) -> bool:
+        """Checks if a directory exists."""
+        p = Path(dir_path)
+        return p.is_dir()
+
+    def check_file_exists(self, file_path: Path) -> bool:
+        """Checks if a file exists."""
+        return file_path.is_file()
+
+    def reload_daemon(self) -> CommandResult:
+        """Reloads the systemd daemon."""
+        return self._runner.run(
+            ["systemctl", "daemon-reload"], sudo=True
+        )
+
     def user_exists(self, username: str) -> bool:
-        """
-        Check if a system user exists.
-        
-        Args:
-            username: Username to check
-            
-        Returns:
-            bool: True if user exists, False otherwise
-        """
-        try:
-            # Try to get user info using id command
-            result = subprocess.run(
-                ["id", username],
-                capture_output=True,
-                text=True,
-            )
-            return result.returncode == 0
-        except Exception:
-            # If any error occurs, assume user doesn't exist
-            return False
+        """Checks if a system user exists."""
+        res = self._runner.run(["id", username])
+        return res.success

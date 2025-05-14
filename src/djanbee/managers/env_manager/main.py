@@ -137,7 +137,9 @@ class EnvManager:
                 # Check dependencies using direct pip commands
                 missing_packages = []
                 for package in required_packages:
-                    if not self.os_manager.check_pip_package_installed(package):
+                    res = self.os_manager.check_pip_package_installed(package)
+
+                    if not res.success:
                         missing_packages.append(package)
 
                 if not missing_packages:

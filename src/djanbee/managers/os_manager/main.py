@@ -1,10 +1,10 @@
 import os
 import platform
-import subprocess
 from pathlib import Path
-from typing import Callable, List, Tuple
+from typing import Callable, List, Optional, Union, Tuple
 from collections import namedtuple
 
+from .command_runner import CommandRunner, CommandResult
 from .os_implementations import UnixOSManager, WindowsOSManager
 
 Result = namedtuple("Result", ["valid", "object"])
@@ -12,12 +12,13 @@ Result = namedtuple("Result", ["valid", "object"])
 
 class OSManager:
     def __init__(self):
-        """Initializes platform-specific OS manager"""
+        """Initializes the platform-specific OS manager with a shared CommandRunner."""
+        self._runner = CommandRunner()
         system = platform.system().lower()
         if system == "windows":
-            self._manager = WindowsOSManager()
+            self._manager = WindowsOSManager(self._runner)
         else:
-            self._manager = UnixOSManager()
+            self._manager = UnixOSManager(self._runner)
 
     def get_dir(self) -> Path:
         """Returns current working directory"""
@@ -27,45 +28,47 @@ class OSManager:
         """Gets platform-specific pip executable path"""
         return self._manager.get_pip_path(venv_path)
 
-    def check_pip_package_installed(self, package_name: str) -> bool:
+    def check_pip_package_installed(self, package_name: str) -> CommandResult:
+        """Checks if a Python package is installed via pip"""
         return self._manager.check_pip_package_installed(package_name)
 
-    def install_pip_package(self, package_name: str) -> Tuple[bool, str]:
+    def install_pip_package(self, package_name: str) -> CommandResult:
+        """Installs a Python package via pip"""
         return self._manager.install_pip_package(package_name)
 
-    def check_package_installed(self, package_name: str) -> bool:
+    def check_package_installed(self, package_name: str) -> CommandResult:
         """Checks if a system package is installed"""
         return self._manager.check_package_installed(package_name)
 
-    def check_service_status(self, service_name: str) -> bool:
+    def install_package(self, package_name: str) -> CommandResult:
+        """Installs a system package using the appropriate package manager"""
+        return self._manager.install_package(package_name)
+
+    def check_service_status(self, service_name: str) -> CommandResult:
         """Checks if a system service is running"""
         return self._manager.check_service_status(service_name)
 
-    def install_package(self, package_name: str) -> Tuple[bool, str]:
-        """Installs a system package using appropriate package manager"""
-        return self._manager.install_package(package_name)
-
-    def start_service(self, service_name: str) -> Tuple[bool, str]:
+    def start_service(self, service_name: str) -> CommandResult:
         """Starts a system service"""
         return self._manager.start_service(service_name)
 
-    def stop_service(self, service_name: str) -> Tuple[bool, str]:
+    def stop_service(self, service_name: str) -> CommandResult:
         """Stops a system service"""
         return self._manager.stop_service(service_name)
 
-    def restart_service(self, service_name: str) -> Tuple[bool, str]:
+    def restart_service(self, service_name: str) -> CommandResult:
         """Restarts a system service"""
         return self._manager.restart_service(service_name)
 
-    def enable_service(self, service_name: str) -> Tuple[bool, str]:
+    def enable_service(self, service_name: str) -> CommandResult:
         """Enables a service to start on boot"""
         return self._manager.enable_service(service_name)
 
-    def run_command(self, command: str | List[str]) -> Tuple[bool, str]:
+    def run_command(self, command: Union[str, List[str]]) -> CommandResult:
         """Runs a system command"""
         return self._manager.run_command(command)
-    
-    def run_python_command(self, command_args: List[str]) -> Tuple[bool, str]:
+
+    def run_python_command(self, command_args: List[str]) -> CommandResult:
         """Runs a Python command using the system's Python version"""
         return self._manager.run_python_command(command_args)
 
@@ -78,226 +81,148 @@ class OSManager:
         return self._manager.is_admin()
 
     def is_venv_directory(self, path: Path) -> bool:
+        """Checks if a directory is a virtual environment"""
         return self._manager.is_venv_directory(path)
-        
-    def check_directory_exists(self, dir_path: str) -> bool:
-       return self._manager.check_directory_exists(dir_path)
-        
+
+    def check_directory_exists(self, dir_path: Union[str, Path]) -> bool:
+        """Check if a directory exists"""
+        return self._manager.check_directory_exists(dir_path)
+
     def check_file_exists(self, path: Path) -> bool:
         """Check if a file exists"""
         return path.exists() and path.is_file()
 
-    def reload_daemon(self) -> Tuple[bool, str]:
+    def reload_daemon(self) -> CommandResult:
         """Reload system daemon"""
         return self._manager.reload_daemon()
-        
+
     def user_exists(self, username: str) -> bool:
-        """
-        Check if a system user exists.
-        
-        Args:
-            username: Username to check
-            
-        Returns:
-            bool: True if user exists, False otherwise
-        """
+        """Check if a system user exists"""
         return self._manager.user_exists(username)
 
-    # Additional methods specific to OSManager that aren't in BaseOSManager
-    def set_dir(self, dir: str | Path = "."):
-        """Sets OS directory"""
-        try:
-            dir_path = Path(dir)
+    # Additional utility methods not in BaseOSManager
 
-            if not dir_path.exists():
-                raise FileNotFoundError(f"Directory does not exist: {dir_path}")
-            if not dir_path.is_dir():
-                raise NotADirectoryError(f"Path is not a directory: {dir_path}")
+    def set_dir(self, dir: Union[str, Path] = "."):
+        """Sets the process current working directory"""
+        dir_path = Path(dir)
+        if not dir_path.exists():
+            raise FileNotFoundError(f"Directory does not exist: {dir_path}")
+        if not dir_path.is_dir():
+            raise NotADirectoryError(f"Path is not a directory: {dir_path}")
+        os.chdir(dir_path)
 
-            # Changes directory
-            os.chdir(dir_path)
-
-        except Exception as e:
-            raise Exception(f"Failed to set directory: {str(e)}")
-
-    def get_path_basename(self, path: str | Path) -> str:
-        """Get the basename (final component) of a path"""
-        path_obj = Path(path) if not isinstance(path, Path) else path
+    def get_path_basename(self, path: Union[str, Path]) -> str:
+        """Returns the final component of a path"""
+        path_obj = Path(path)
         return path_obj.name
 
     def search_subfolders(
-        self, validator: Callable, max_depth: int = 1, search_path=""
-    ):
+        self, validator: Callable[[Path], Optional[bool]], max_depth: int = 1, search_path: Union[str, Path] = None
+    ) -> List[Result]:
         """Searches subfolders using a validator function"""
-        if not search_path:
+        if search_path is None:
             search_path = self.get_dir()
-
         search_path = Path(search_path)
-        results = []
+        results: List[Result] = []
 
-        def recursion(path, depth):
+        def recurse(path: Path, depth: int):
             if depth > max_depth:
                 return
-
             try:
-                for folder in path.iterdir():
-                    if path.name.startswith("."):
-                        return
-                    result = validator(folder)
-                    if result:
-                        results.append(Result(valid=result, object=folder))
-
-                    if depth < max_depth:
-                        recursion(folder, depth + 1)
+                for child in path.iterdir():
+                    if child.name.startswith('.'):
+                        continue
+                    valid = validator(child)
+                    if valid:
+                        results.append(Result(valid=valid, object=child))
+                    if child.is_dir():
+                        recurse(child, depth + 1)
             except PermissionError:
                 pass
 
-        recursion(search_path, 1)
+        recurse(search_path, 1)
         return results
 
-    def search_folder(self, validator: Callable, search_path=""):
-        """Searches current folder using a validator function"""
-        # If not path given searches current folder
-        if not search_path:
+    def search_folder(self, validator: Callable[[Path], Optional[bool]], search_path: Union[str, Path] = None) -> Optional[Result]:
+        """Searches the given folder using a validator function"""
+        if search_path is None:
             search_path = self.get_dir()
-
-        search_path = Path(search_path)  # convert to path
-
+        path = Path(search_path)
         try:
-            result = validator(search_path)
-            if result:
-                return Result(
-                    valid=result,
-                    object=search_path,
-                )
+            valid = validator(path)
+            if valid:
+                return Result(valid=valid, object=path)
         except PermissionError:
             pass
-
         return None
 
-    def get_environment_variable(self, var_name: str) -> str:
-        """Get an environment variable value"""
+    def get_environment_variable(self, var_name: str) -> Optional[str]:
+        """Retrieves an environment variable's value"""
         return os.environ.get(var_name)
 
-    def run_pip_command(self, venv_path: Path, pip_args: List[str]) -> Tuple[bool, str]:
-        """Run a pip command in a virtual environment"""
-        pip_path = self._manager.get_pip_path(venv_path)
-
-        try:
-            result = subprocess.run(
-                [str(pip_path)] + pip_args, capture_output=True, text=True, check=True
-            )
-            return True, result.stdout
-        except subprocess.CalledProcessError as e:
-            return False, f"Failed to run pip command: {e.stderr}"
-        except Exception as e:
-            return False, f"Error running pip command: {str(e)}"
+    def run_pip_command(self, venv_path: Path, pip_args: List[str]) -> CommandResult:
+        """Runs a pip command inside a virtual environment"""
+        pip_path = self.get_pip_path(venv_path)
+        return self._runner.run([str(pip_path)] + pip_args)
 
     def write_text_file(
         self, path: Path, content: str, use_sudo: bool = False
-    ) -> Tuple[bool, str]:
+    ) -> CommandResult:
         """
-        Write text content to a file, optionally using sudo
-
-        Args:
-            path: Path to the file
-            content: Text content to write
-            use_sudo: Whether to use sudo privileges (default: False)
-
-        Returns:
-            Tuple of (success, message)
+        Writes text to a file, optionally using sudo privileges.
         """
-        try:
-            if not use_sudo:
-                # Direct write without sudo
+        if not use_sudo:
+            try:
                 path.write_text(content)
-                return True, "File written successfully"
-            else:
-                # Create a temporary file first
-                import tempfile
-
-                with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp:
-                    temp_path = temp.name
-                    temp.write(content)
-
-                # Use sudo to move the temporary file to the target location
-                move_command = ["sudo", "mv", temp_path, str(path)]
-                result = subprocess.run(move_command, capture_output=True, text=True)
-                if result.returncode == 0:
-                    # Set proper permissions if needed
-                    chmod_command = ["sudo", "chmod", "644", str(path)]
-                    subprocess.run(chmod_command, capture_output=True, text=True)
-                    return True, "File written successfully with sudo"
-                else:
-                    return False, f"Error writing file with sudo: {result.stderr}"
-
-        except Exception as e:
-            return False, f"Error writing file: {str(e)}"
+                return CommandResult(success=True, stdout="File written successfully", stderr="", exit_code=0)
+            except Exception as e:
+                return CommandResult(success=False, stdout="", stderr=str(e), exit_code=1)
+        # sudo path
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
+            tmp.write(content)
+            temp_path = tmp.name
+        mv_res = self._runner.run(["mv", temp_path, str(path)], sudo=True)
+        if not mv_res.success:
+            return mv_res
+        return self._runner.run(["chmod", "644", str(path)], sudo=True)
 
     def check_python_package_installed(
-        self, venv_path: str | Path, package_name: str
-    ) -> Tuple[bool, str]:
-        """Checks if a Python package is installed in virtual environment"""
+        self, venv_path: Union[str, Path], package_name: str
+    ) -> CommandResult:
+        """Checks if a package is installed in the virtual environment via pip"""
         venv_path = Path(venv_path)
-        pip_path = self._manager.get_pip_path(venv_path)
-
-        try:
-            # Run pip list to check if the package is installed
-            result = subprocess.run(
-                [str(pip_path), "list"], capture_output=True, text=True, check=True
-            )
-
-            # Check if the package is in the output
-            if (
-                f"{package_name} " in result.stdout
-                or f"\n{package_name} " in result.stdout
-            ):
-                return True, f"{package_name} is installed"
-            else:
-                return False, f"{package_name} is not installed"
-
-        except subprocess.CalledProcessError as e:
-            return False, f"Failed to check if {package_name} is installed: {e.stderr}"
-        except Exception as e:
-            return False, f"Error checking package installation: {str(e)}"
+        pip_path = self.get_pip_path(venv_path)
+        res = self._runner.run([str(pip_path), "list"])
+        if not res.success:
+            return res
+        installed = any(
+            line.split()[0] == package_name for line in res.stdout.splitlines()
+        )
+        msg = f"{package_name} is {'installed' if installed else 'not installed'}"
+        return CommandResult(success=installed, stdout=msg, stderr="", exit_code=res.exit_code)
 
     def check_postgres_dependencies(
-        self, venv_path: str | Path
+        self, venv_path: Union[str, Path]
     ) -> Tuple[bool, List[str]]:
-        """Checks for PostgreSQL dependencies in virtual environment"""
-        required_packages = ["psycopg2", "psycopg2-binary"]
-        missing_packages = []
+        """Identifies missing PostgreSQL dependencies in a virtual environment"""
+        required = ["psycopg2", "psycopg2-binary"]
+        missing = []
+        for pkg in required:
+            res = self.check_python_package_installed(venv_path, pkg)
+            if not res.success:
+                missing.append(pkg)
+        return (len(missing) == 0, missing)
 
-        for package in required_packages:
-            is_installed, _ = self.check_python_package_installed(venv_path, package)
-            if not is_installed:
-                missing_packages.append(package)
-
-        return len(missing_packages) == 0, missing_packages
-
-    def ensure_postgres_dependencies(self, venv_path: str | Path) -> Tuple[bool, str]:
-        """Ensures PostgreSQL dependencies are installed in virtual environment"""
-        venv_path = Path(venv_path)
-        pip_path = self._manager.get_pip_path(venv_path)
-
-        # Check if dependencies are already installed
-        all_installed, missing_packages = self.check_postgres_dependencies(venv_path)
-
-        if all_installed:
-            return True, "PostgreSQL dependencies are already installed"
-
-        # Install missing packages
-        for package in missing_packages:
-            try:
-                result = subprocess.run(
-                    [str(pip_path), "install", package],
-                    capture_output=True,
-                    text=True,
-                    check=True,
-                )
-            except subprocess.CalledProcessError as e:
-                return False, f"Failed to install {package}: {e.stderr}"
-            except Exception as e:
-                return False, f"Error installing {package}: {str(e)}"
-
-        return True, "PostgreSQL dependencies were successfully installed"
+    def ensure_postgres_dependencies(
+        self, venv_path: Union[str, Path]
+    ) -> CommandResult:
+        """Installs missing PostgreSQL dependencies in a virtual environment"""
+        ok, missing = self.check_postgres_dependencies(venv_path)
+        if ok:
+            return CommandResult(success=True, stdout="Postgres dependencies already installed", stderr="", exit_code=0)
+        for pkg in missing:
+            res = self._runner.run([str(self.get_pip_path(Path(venv_path))), "install", pkg])
+            if not res.success:
+                return res
+        return CommandResult(success=True, stdout="Postgres dependencies installed successfully", stderr="", exit_code=0)

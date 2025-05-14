@@ -5,6 +5,7 @@ from ..base import BaseServerManager
 from ...os_manager import OSManager
 from ...console_manager import ConsoleManager
 from ...django_manager import DjangoManager
+from ...os_manager.command_runner import CommandResult
 
 
 class NginxServerManager(BaseServerManager):
@@ -65,11 +66,11 @@ class NginxServerManager(BaseServerManager):
         """Returns the list of dependencies required by this server"""
         return self.dependencies
 
-    def check_gunicorn_installed(self) -> bool:
+    def check_gunicorn_installed(self) -> CommandResult:
         """Checks if Gunicorn is installed via pip"""
         return self.os_manager.check_pip_package_installed("gunicorn")
 
-    def install_gunicorn(self) -> Tuple[bool, str]:
+    def install_gunicorn(self) -> tuple[bool, str] | CommandResult:
         """Installs Gunicorn if not already installed"""
         if self.check_gunicorn_installed():
             return True, "Gunicorn is already installed"

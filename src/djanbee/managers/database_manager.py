@@ -1,4 +1,6 @@
 from typing import Tuple, List, Optional
+
+from .os_manager.command_runner import CommandResult
 from ..managers import OSManager, ConsoleManager, EnvManager
 
 
@@ -270,7 +272,7 @@ class DatabaseManager:
         """Returns the list of dependencies required by the database manager"""
         return self.dependencies
 
-    def check_dependency_installed(self, dependency: str) -> bool:
+    def check_dependency_installed(self, dependency: str) -> CommandResult | bool:
         """Checks if a specific dependency is installed"""
         if dependency == "psycopg2-binary":
             return self.os_manager.check_pip_package_installed(
@@ -278,7 +280,7 @@ class DatabaseManager:
             ) or self.os_manager.check_pip_package_installed("psycopg2-binary")
         return False
 
-    def install_dependency(self, dependency: str) -> Tuple[bool, str]:
+    def install_dependency(self, dependency: str) -> tuple[bool, str] | CommandResult:
         """Install a specific dependency"""
         if dependency not in self.dependencies:
             return False, f"{dependency} is not a recognized dependency"
