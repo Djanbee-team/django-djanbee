@@ -54,7 +54,7 @@ class ListSelector(ConsoleWidget):
             # Handle number key input for direct selection
 
             if k.isdigit():
-                num = int(key)
+                num = int(k)
                 if 1 <= num <= len(self.options):
                     return self.options[num - 1]
 
