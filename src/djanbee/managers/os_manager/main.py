@@ -1,7 +1,7 @@
 import os
 import platform
 from pathlib import Path
-from typing import Callable, List, Optional, Union, Tuple
+from typing import Callable, List, Optional, Union, Tuple, Any
 from collections import namedtuple
 
 from .command_runner import CommandRunner, CommandResult
@@ -117,12 +117,15 @@ class OSManager:
         return path_obj.name
 
     def search_subfolders(
-        self, validator: Callable[[Path], Optional[bool]], max_depth: int = 1, search_path: Union[str, Path] = None
+            self,
+            validator: Callable[[Any], Optional[bool]],
+            max_depth: int = 1,
+            search_path: Union[str, Path] = None
     ) -> List[Result]:
-        """Searches subfolders using a validator function"""
+        """Searches subfolders using a validator that may take a Path or a str."""
         if search_path is None:
             search_path = self.get_dir()
-        search_path = Path(search_path)
+        root = Path(search_path)
         results: List[Result] = []
 
         def recurse(path: Path, depth: int):
@@ -132,28 +135,46 @@ class OSManager:
                 for child in path.iterdir():
                     if child.name.startswith('.'):
                         continue
+
+                    # Try validator with Path
                     valid = validator(child)
+                    # Fallback to validator with str(path)
+                    if not valid:
+                        valid = validator(str(child))
+
                     if valid:
                         results.append(Result(valid=valid, object=child))
+
                     if child.is_dir():
                         recurse(child, depth + 1)
             except PermissionError:
                 pass
 
-        recurse(search_path, 1)
+        recurse(root, 1)
         return results
 
-    def search_folder(self, validator: Callable[[Path], Optional[bool]], search_path: Union[str, Path] = None) -> Optional[Result]:
-        """Searches the given folder using a validator function"""
+    def search_folder(
+            self,
+            validator: Callable[[Any], Optional[bool]],
+            search_path: Union[str, Path] = None
+    ) -> Optional[Result]:
+        """Searches the given folder using a validator that may take a Path or a str."""
         if search_path is None:
             search_path = self.get_dir()
+
         path = Path(search_path)
         try:
-            valid = validator(path)
-            if valid:
-                return Result(valid=valid, object=path)
+            # first try as Path
+            res = validator(path)
+            if res:
+                return Result(valid=res, object=path)
+            # then try as str, for backwards‐compatible validators
+            res = validator(str(path))
+            if res:
+                return Result(valid=res, object=path)
         except PermissionError:
             pass
+
         return None
 
     def get_environment_variable(self, var_name: str) -> Optional[str]:

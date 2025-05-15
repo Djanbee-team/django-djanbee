@@ -219,10 +219,10 @@ class ConfigureDatabaseManager:
         
         # 2. Grant schema permissions
         schema_cmd = f'sudo -u postgres psql -d {db_name} -c "GRANT ALL ON SCHEMA public TO {current_user}; ALTER SCHEMA public OWNER TO {current_user};"'
-        schema_success, _ = self.app.os_manager.run_command(schema_cmd)
+        schema_success = self.app.os_manager.run_command(schema_cmd)
         
         # Report permissions result
-        if owner_success and schema_success:
+        if owner_success and schema_success.success:
             self.display.show_permissions_success()
         else:
             self.display.show_permissions_error()

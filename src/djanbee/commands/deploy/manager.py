@@ -26,11 +26,11 @@ class DeployManager:
             # Prompt user to install nginx
             if self.display.prompt_install_nginx():
                 self.display.progress_install_dep("nginx")
-                is_installed, response = self.app.server_manager.install_server()
-                if is_installed:
+                res = self.app.server_manager.install_server()
+                if res.success:
                     self.display.nginx_installed_success()
                 else:
-                    self.display.nginx_installed_failure(response)
+                    self.display.nginx_installed_failure(res.stderr)
                     return False
             else:
                 self.display.nginx_required_abort()

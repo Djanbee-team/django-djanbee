@@ -6,6 +6,7 @@ from ..os_manager import OSManager
 from ..console_manager import ConsoleManager
 from ..django_manager import DjangoManager
 from .server_implementations import NginxServerManager
+from ..os_manager.command_runner import CommandResult
 
 Result = namedtuple("Result", ["valid", "object"])
 
@@ -33,27 +34,27 @@ class ServerManager:
         """Checks if the server is installed"""
         return self._manager.check_server_installed()
 
-    def install_server(self) -> Tuple[bool, str]:
+    def install_server(self) -> CommandResult:
         """Installs the server if not already installed"""
         return self._manager.install_server()
 
-    def start_server(self) -> Tuple[bool, str]:
+    def start_server(self) -> CommandResult:
         """Starts the server"""
         return self._manager.start_server()
 
-    def stop_server(self) -> Tuple[bool, str]:
+    def stop_server(self) -> CommandResult:
         """Stops the server"""
         return self._manager.stop_server()
 
-    def restart_server(self) -> Tuple[bool, str]:
+    def restart_server(self) -> CommandResult:
         """Restarts the server"""
         return self._manager.restart_server()
 
-    def enable_server(self) -> Tuple[bool, str]:
+    def enable_server(self) -> CommandResult:
         """Enables the server to start on boot"""
         return self._manager.enable_server()
 
-    def check_server_status(self) -> bool:
+    def check_server_status(self) -> CommandResult:
         """Checks if the server is running"""
         return self._manager.check_server_status()
 

@@ -105,9 +105,9 @@ class DatabaseManager:
         try:
             # Run the command as the postgres system user
             cmd = f'sudo -u postgres psql -c "{command}"'
-            success, output = self.os_manager.run_command(cmd)
-            if not success:
-                return False, f"Command failed: {output}"
+            success = self.os_manager.run_command(cmd)
+            if not success.success:
+                return False, f"Command failed: {success.stderr}"
             return True, "Command executed successfully"
         except Exception as e:
             return False, f"Database error: {str(e)}"
@@ -180,9 +180,9 @@ class DatabaseManager:
         ]
 
         for package in package_names:
-            success, message = self.os_manager.install_package(package)
+            success = self.os_manager.install_package(package)
             if not success:
-                return False, f"Failed to install {package}: {message}"
+                return False, f"Failed to install {package}: {success.stderr}"
 
         return True, "PostgreSQL packages installed successfully"
 
@@ -194,14 +194,14 @@ class DatabaseManager:
             Tuple[bool, str]: (success, message)
         """
         # Enable service
-        success, message = self.os_manager.enable_service("postgresql")
-        if not success:
-            return False, f"Failed to enable PostgreSQL service: {message}"
+        success = self.os_manager.enable_service("postgresql")
+        if not success.success:
+            return False, f"Failed to enable PostgreSQL service: {success.stderr}"
 
         # Start service
-        success, message = self.os_manager.start_service("postgresql")
-        if not success:
-            return False, f"Failed to start PostgreSQL service: {message}"
+        success = self.os_manager.start_service("postgresql")
+        if not success.success:
+            return False, f"Failed to start PostgreSQL service: {success.stderr}"
 
         return True, "PostgreSQL service started successfully"
 
@@ -215,11 +215,11 @@ class DatabaseManager:
         try:
             # Create default user if doesn't exist
             if not self.os_manager.user_exists("postgres"):
-                success, message = self.os_manager.run_command(
+                success = self.os_manager.run_command(
                     "sudo -u postgres createuser --superuser $USER"
                 )
-                if not success:
-                    return False, f"Failed to create PostgreSQL user: {message}"
+                if not success.success:
+                    return False, f"Failed to create PostgreSQL user: {success.stderr}"
 
             return True, "PostgreSQL user configured successfully"
         except Exception as e:
@@ -243,7 +243,7 @@ class DatabaseManager:
 
     def check_postgres_status(self) -> bool:
         is_active = self.os_manager._manager.check_service_status("postgresql")
-        return is_active
+        return is_active.success
 
     def get_all_databases(self) -> Tuple[bool, list | str]:
         """
@@ -255,13 +255,13 @@ class DatabaseManager:
         try:
             # Use psql to list databases
             cmd = "sudo -u postgres psql -t -c \"SELECT datname FROM pg_database WHERE datname NOT IN ('template0', 'template1', 'postgres');\""
-            success, output = self.os_manager.run_command(cmd)
+            success = self.os_manager.run_command(cmd)
 
-            if not success:
-                return False, f"Failed to get databases: {output}"
+            if not success.success:
+                return False, f"Failed to get databases: {success.stderr}"
 
             # Process the output - strip whitespace and empty lines
-            databases = [db.strip() for db in output.split("\n") if db.strip()]
+            databases = [db.strip() for db in success.stdout.split("\n") if db.strip()]
             return True, databases
 
         except Exception as e:
@@ -272,29 +272,41 @@ class DatabaseManager:
         """Returns the list of dependencies required by the database manager"""
         return self.dependencies
 
-    def check_dependency_installed(self, dependency: str) -> CommandResult | bool:
+    def check_dependency_installed(self, dependency: str) -> bool:
         """Checks if a specific dependency is installed"""
         if dependency == "psycopg2-binary":
             return self.os_manager.check_pip_package_installed(
                 "psycopg2"
-            ) or self.os_manager.check_pip_package_installed("psycopg2-binary")
+            ).success or self.os_manager.check_pip_package_installed("psycopg2-binary").success
         return False
 
-    def install_dependency(self, dependency: str) -> tuple[bool, str] | CommandResult:
-        """Install a specific dependency"""
+    def install_dependency(self, dependency: str) -> CommandResult:
+        """Install a specific dependency."""
         if dependency not in self.dependencies:
-            return False, f"{dependency} is not a recognized dependency"
+            return CommandResult(
+                success=False,
+                stdout="",
+                stderr=f"{dependency} is not a recognized dependency",
+                exit_code=1,
+            )
 
         if dependency == "psycopg2-binary":
             # First ensure libpq-dev is installed (needed for psycopg2)
-            success, message = self.os_manager.install_package("libpq-dev")
-            if not success and self.console_manager:
-                self.console_manager.print_step_failure("Dependencies", message)
+            libpq_res = self.os_manager.install_package("libpq-dev")
+            if not libpq_res.success and self.console_manager:
+                self.console_manager.print_step_failure(
+                    "Dependencies", libpq_res.stderr
+                )
 
             # Install with pip
             return self.os_manager.install_pip_package("psycopg2-binary")
 
-        return False, f"No installation method for {dependency}"
+        return CommandResult(
+            success=False,
+            stdout="",
+            stderr=f"No installation method for {dependency}",
+            exit_code=1,
+        )
 
     def verify_dependencies(self) -> List[Tuple[str, bool, str]]:
         """Verifies all dependencies and returns results"""
@@ -316,9 +328,9 @@ class DatabaseManager:
             bool: True if all dependencies are available (or were successfully installed), False otherwise
         """
         # First ensure system dependencies (libpq-dev is needed for psycopg2)
-        success, message = self.os_manager.install_package("libpq-dev")
-        if not success and self.console_manager:
-            self.console_manager.print_step_failure("System Dependency", message)
+        success = self.os_manager.install_package("libpq-dev")
+        if not success.success and self.console_manager:
+            self.console_manager.print_step_failure("System Dependency", success.stderr)
 
         # Use the env_manager to handle Python package dependencies if available
         if self.env_manager:
@@ -331,6 +343,6 @@ class DatabaseManager:
 
         # Fallback to directly checking packages if env_manager not provided
         return all(
-            self.os_manager.check_pip_package_installed(pkg)
+            self.os_manager.check_pip_package_installed(pkg).success
             for pkg in self.dependencies
         )
