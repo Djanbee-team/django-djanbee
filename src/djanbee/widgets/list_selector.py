@@ -1,65 +1,45 @@
 from typing import Optional, List
-from rich.panel import Panel
 from rich.text import Text
 from ..managers import ConsoleManager
+from .console_widget import ConsoleWidget
+from .widget_icons import WidgetIcons
+from readchar import key, readkey
 
 
-class ListSelector:
+class ListSelector(ConsoleWidget):
     def __init__(
         self, message: str, options: List[str], console_manager: ConsoleManager
     ):
+        super().__init__(message,
+                         "Use ↑↓ to navigate, Enter to select, number keys for direct choice, Ctrl+C to cancel\n\n",
+                         console_manager, WidgetIcons.LIST)
+
         self.selected_index = 0
         self.console_manager = console_manager
         self.message = message
         self.options = options
-
-    def prepare_message(self):
-        """Print question message in blue with list emoji and border"""
-        text = Text()
-        text.append("📋 ", style="")  # List emoji
-        text.append(self.message, style="blue")
-        text.append("\n")
-        return text
-
-    def _render_options(self):
-        """Render the list selection options."""
-        content = Text()
+        
+    def prepare_list_options(self):
+        list_options = Text()
 
         for idx, option in enumerate(self.options):
             if idx > 0:
-                content.append("\n")
+                list_options.append("\n")
 
             if idx == self.selected_index:
-                content.append(f"→ {option} ←", style="reverse")
+                list_options.append(f"→ {option} ←", style="reverse")
             else:
-                content.append(f"  {option}  ", style="")
+                list_options.append(f"  {option}  ", style="")
+        
+        return list_options
 
-        instructions = Text(
-            "Use ↑↓ to navigate, Enter to select, number keys for direct choice, Ctrl+C to cancel\n\n",
-            style="dim",
-        )
+    def _render_list_widget(self):
+        """Render the list """
 
-        panel_content = Text.assemble(
-            instructions, self.prepare_message(), "\n", content
-        )
+        content = self.prepare_list_options()
+        panel = self.construct_panel(content)
+        self.render(panel)
 
-        panel = Panel(panel_content, border_style="blue")
-
-        if not hasattr(self, "_first_render"):
-            # First time rendering
-            with self.console_manager.console.capture() as capture:
-                self.console_manager.console.print(panel)
-            # Count actual rendered lines
-            self._panel_lines = len(capture.get().split("\n")) - 1
-            # Print the actual panel
-            self.console_manager.console.print(panel)
-            self._first_render = True
-        else:
-            # Move cursor up by the number of lines in the panel
-            print(f"\033[{self._panel_lines}A", end="")
-            # Clear from cursor to end of screen
-            print("\033[J", end="")
-            self.console_manager.console.print(panel)
 
     def select(self) -> Optional[int]:
         """
@@ -68,49 +48,28 @@ class ListSelector:
         Returns:
             Selected index (0-based) or None for cancel
         """
-        import sys
-        import termios
-        import tty
-
-        def getch():
-            """Read a single character from stdin."""
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            try:
-                tty.setraw(fd)
-                ch = sys.stdin.read(1)
-            finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-            return ch
-
         while True:
-            self._render_options()
-
-            key = getch()
-
+            self._render_list_widget()
+            k = readkey()
             # Handle number key input for direct selection
-            if key.isdigit():
+
+            if k.isdigit():
                 num = int(key)
                 if 1 <= num <= len(self.options):
-                    return num - 1
+                    return self.options[num - 1]
 
-            # Arrow key handling
-            elif key == "\x1b":
-                next1, next2 = getch(), getch()
-                if next1 == "[":
-                    if next2 == "A":  # Up arrow
-                        self.selected_index = (self.selected_index - 1) % len(
-                            self.options
-                        )
-                    elif next2 == "B":  # Down arrow
-                        self.selected_index = (self.selected_index + 1) % len(
-                            self.options
-                        )
-
-            # Enter key
-            elif key in ["\r", "\n"]:
+            # Handle arrow keys using readchar's constants
+            elif k == key.UP:
+                self.selected_index = (self.selected_index - 1) % len(self.options)
+            elif k == key.DOWN:
+                self.selected_index = (self.selected_index + 1) % len(self.options)
+            
+            # Handle Enter key
+            elif k == key.ENTER:
                 return self.options[self.selected_index]
+            
+            # Handle Escape or Ctrl+C
+            if self.handle_exit(k):
+                return None 
 
-            # Ctrl+C
-            elif key == "\x03":
-                return None
+
