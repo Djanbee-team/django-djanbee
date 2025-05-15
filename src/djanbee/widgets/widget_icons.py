@@ -4,3 +4,4 @@ class WidgetIcons(Enum):
     LIST = "📋"
     CHECKBOX = "☑️ "
     QUESTION = "❓"
+    TEXT_INPUT = "✏️ "
