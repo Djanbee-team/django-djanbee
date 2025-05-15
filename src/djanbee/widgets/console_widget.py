@@ -14,27 +14,29 @@ class ConsoleWidget(BaseConsoleWidget):
         instructions: str,
         console_manager: ConsoleManager,
         icon: Union[str, WidgetIcons] = "",
-        color: str = "blue"
+        color: str = "blue",
+        warning: str = ""
     ) -> None:
         self.message = message
         self.instructions = instructions
         self.console_manager = console_manager
         self.icon = icon.value if isinstance(icon, WidgetIcons) else icon
         self.color = color
+        self.warning = warning
         self._first_render = False
         self._panel_lines: int = 0
 
     def construct_panel(self, content: Union[str, Text]) -> Panel:
         instructions = self._prepare_instructions()
         message = self._prepare_message()
+        warning = self._prepare_warning()
 
         panel_content = Text.assemble(
-             '\n',message, instructions, content, '\n'
+             '\n', message, instructions, warning, content, '\n'
         )
 
         return Panel(panel_content, border_style=self.color, box=box.HEAVY)
 
-    
     def _prepare_message(self) -> Text:
         """Create formatted message text with icon and colored text"""
         text = Text()
@@ -51,6 +53,15 @@ class ConsoleWidget(BaseConsoleWidget):
             style="dim",
         )
         return instructions
+    
+    def _prepare_warning(self) -> Text:
+        """Format warning message if present"""
+        text = Text()
+        if self.warning:
+            text.append("!!! ", style="yellow") 
+            text.append(self.warning, style="yellow")
+            text.append("\n\n")
+        return text
 
     def render(self, panel: Panel) -> None:
         # Calculate the current panel height based on content

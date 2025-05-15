@@ -8,14 +8,20 @@ from readchar import key, readkey
 
 class CheckboxSelector(ConsoleWidget):
     def __init__(
-        self, message: str, options: List[str], console_manager: ConsoleManager, pre_selected: Optional[List[str]] = None
+        self, 
+        message: str, 
+        options: List[str], 
+        console_manager: ConsoleManager, 
+        pre_selected: Optional[List[str]] = None,
+        warning: str = ""
     ):
         super().__init__(
             message=message,
             instructions="Use ↑↓ to navigate, Space to toggle, Enter to confirm selection, a to toggle all, Ctrl+C to cancel\n\n",
             console_manager=console_manager,
             icon=WidgetIcons.CHECKBOX,
-            color="blue"
+            color="blue",
+            warning=warning
         )
         
         self.cursor_index = 0
