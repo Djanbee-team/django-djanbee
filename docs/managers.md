@@ -4,8 +4,6 @@
 
 A manager in Djanbee is a specialized component that handles one specific domain of functionality. Each manager is responsible for only its own abstraction level - it doesn't reach across boundaries or try to handle responsibilities outside its domain.
 
-Think of managers like specialized departments in a company - the HR department handles personnel issues, the Finance department handles money matters, and they work together through well-defined channels without taking over each other's jobs.
-
 ## Why Use Managers?
 
 Managers provide several key benefits:
@@ -37,6 +35,40 @@ Djanbee uses a consistent structure for all managers that consists of:
    - Example: `OSManager` detects the operating system and uses the appropriate implementation
 
 This structure allows Djanbee to work across different environments while keeping code organized and maintainable. When a Windows-specific operation is needed, only the Windows implementation needs to change, leaving all other code untouched.
+
+## Manager Hierarchy
+
+*IMPORTANT: The Python `subprocess` module should ONLY be used through the `CommandRunner` abstraction. Direct subprocess calls elsewhere in the codebase are strictly prohibited.*
+
+Djanbee implements a clear hierarchy of responsibility for system-level operations:
+
+### CommandRunner
+
+All system-level functionality begins with the `CommandRunner` class, which serves as the foundation for executing external processes. This abstraction:
+
+- Provides a uniform interface for running system commands
+- Handles command string parsing, sudo elevation, and process execution
+- Encapsulates subprocess functionality to prevent scattered implementations
+- Returns standardized `CommandResult` objects with the following properties:
+
+  ```python
+  success: bool    # Whether the operation was successful
+  stdout: str      # Standard output of the command
+  stderr: str      # Standard error of the command  
+  exit_code: int   # Process exit code
+  ```
+
+The `CommandRunner` is used by the `OSManager`, which then exposes higher-level operations to other managers in the system.
+
+### Manager Communication Chain
+
+System operations flow through this chain:
+1. Command-specific managers request operations
+2. These requests flow to the appropriate domain manager
+3. Domain managers use the `OSManager` for system interactions
+4. The `OSManager` utilizes `CommandRunner` for process execution
+
+This structure ensures that subprocess calls are never scattered throughout the application but are always managed through the proper abstraction layers.
 
 ## Key Managers
 
