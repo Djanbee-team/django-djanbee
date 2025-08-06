@@ -1,30 +1,35 @@
 from typing import Optional, List, Set
-from rich.panel import Panel
 from rich.text import Text
 from ..managers import ConsoleManager
+from .console_widget import ConsoleWidget
+from .widget_icons import WidgetIcons
+from readchar import key, readkey
 
 
-class CheckboxSelector:
+class CheckboxSelector(ConsoleWidget):
     def __init__(
-        self, message: str, options: List[str], console_manager: ConsoleManager, pre_selected: Optional[List[str]] = None
+        self, 
+        message: str, 
+        options: List[str], 
+        console_manager: ConsoleManager, 
+        pre_selected: Optional[List[str]] = None,
+        warning: str = ""
     ):
+        super().__init__(
+            message=message,
+            instructions="Use ↑↓ to navigate, Space to toggle, Enter to confirm selection, a to toggle all, Ctrl+C to cancel\n\n",
+            console_manager=console_manager,
+            icon=WidgetIcons.CHECKBOX,
+            color="blue",
+            warning=warning
+        )
+        
         self.cursor_index = 0
         self.selected_indices = set()
-        self.console_manager = console_manager
-        self.message = message
         self.options = options
         
         if pre_selected:
             self._set_pre_selected(pre_selected)
-
-
-    def prepare_message(self):
-        """Print question message in blue with checkbox emoji and border"""
-        text = Text()
-        text.append("✓ ", style="")  # Checkbox emoji
-        text.append(self.message, style="blue")
-        text.append("\n")
-        return text
 
     def _set_pre_selected(self, pre_selected: List[str]):
         """
@@ -38,8 +43,8 @@ class CheckboxSelector:
             if option in self.options:
                 self.selected_indices.add(self.options.index(option))
 
-    def _render_options(self):
-        """Render the checkbox selection options."""
+    def prepare_checkbox_options(self):
+        """Prepare the checkbox selection options."""
         content = Text()
 
         for idx, option in enumerate(self.options):
@@ -53,33 +58,14 @@ class CheckboxSelector:
                 content.append(f"→ {checkbox} {option}", style="reverse")
             else:
                 content.append(f"  {checkbox} {option}", style="")
+                
+        return content
 
-        instructions = Text(
-            "Use ↑↓ to navigate, Space to toggle, Enter to confirm selection, Ctrl+C to cancel\n\n",
-            style="dim",
-        )
-
-        panel_content = Text.assemble(
-            instructions, self.prepare_message(), "\n", content
-        )
-
-        panel = Panel(panel_content, border_style="blue")
-
-        if not hasattr(self, "_first_render"):
-            # First time rendering
-            with self.console_manager.console.capture() as capture:
-                self.console_manager.console.print(panel)
-            # Count actual rendered lines
-            self._panel_lines = len(capture.get().split("\n")) - 1
-            # Print the actual panel
-            self.console_manager.console.print(panel)
-            self._first_render = True
-        else:
-            # Move cursor up by the number of lines in the panel
-            print(f"\033[{self._panel_lines}A", end="")
-            # Clear from cursor to end of screen
-            print("\033[J", end="")
-            self.console_manager.console.print(panel)
+    def _render_checkbox_widget(self):
+        """Render the checkbox widget"""
+        content = self.prepare_checkbox_options()
+        panel = self.construct_panel(content)
+        self.render(panel)
 
     def select(self) -> List[str]:
         """
@@ -88,55 +74,37 @@ class CheckboxSelector:
         Returns:
             List of selected option strings or empty list if canceled
         """
-        import sys
-        import termios
-        import tty
-
-        def getch():
-            """Read a single character from stdin."""
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            try:
-                tty.setraw(fd)
-                ch = sys.stdin.read(1)
-            finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-            return ch
-
         while True:
-            self._render_options()
-
-            key = getch()
-
-            # Arrow key handling
-            if key == "\x1b":
-                next1, next2 = getch(), getch()
-                if next1 == "[":
-                    if next2 == "A":  # Up arrow
-                        self.cursor_index = (self.cursor_index - 1) % len(self.options)
-                    elif next2 == "B":  # Down arrow
-                        self.cursor_index = (self.cursor_index + 1) % len(self.options)
-
+            self._render_checkbox_widget()
+            
+            k = readkey()
+            
+            # Handle arrow keys
+            if k == key.UP:
+                self.cursor_index = (self.cursor_index - 1) % len(self.options)
+            elif k == key.DOWN:
+                self.cursor_index = (self.cursor_index + 1) % len(self.options)
+            
             # Space key to toggle selection
-            elif key == " ":
+            elif k == key.SPACE:
                 if self.cursor_index in self.selected_indices:
                     self.selected_indices.remove(self.cursor_index)
                 else:
                     self.selected_indices.add(self.cursor_index)
-
+            
             # 'a' key to select all
-            elif key.lower() == "a":
+            elif k.lower() == "a":
                 if len(self.selected_indices) == len(self.options):
                     # If all are selected, deselect all
                     self.selected_indices.clear()
                 else:
                     # Otherwise select all
                     self.selected_indices = set(range(len(self.options)))
-
+            
             # Enter key to confirm selection
-            elif key in ["\r", "\n"]:
+            elif k == key.ENTER:
                 return [self.options[i] for i in self.selected_indices]
-
-            # Ctrl+C to cancel
-            elif key == "\x03":
-                return None
+            
+            # Handle exit (Ctrl+C, q, Q)
+            if self.handle_exit(k):
+                return []

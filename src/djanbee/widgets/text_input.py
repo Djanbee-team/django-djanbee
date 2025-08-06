@@ -1,10 +1,12 @@
 from typing import Optional, List, Dict, Tuple
-from rich.panel import Panel
 from rich.text import Text
 from ..managers import ConsoleManager
+from .console_widget import ConsoleWidget
+from .widget_icons import WidgetIcons
+from readchar import key, readkey
 
 
-class TextInputWidget:
+class TextInputWidget(ConsoleWidget):
     def __init__(
         self,
         title: str,
@@ -12,6 +14,7 @@ class TextInputWidget:
         console_manager: ConsoleManager,
         create_button_text: str = "Create",
         cancel_button_text: str = "Cancel",
+        warning: str = ""
     ):
         """
         Initialize a text input widget with multiple fields.
@@ -22,10 +25,18 @@ class TextInputWidget:
             console_manager: Console manager for rendering
             create_button_text: Text for the create/confirm button
             cancel_button_text: Text for the cancel button
+            warning: Optional warning message to display
         """
-        self.title = title
+        super().__init__(
+            message=title,
+            instructions="Use Tab/↑↓/←→ to navigate, Enter to confirm, Ctrl+C to cancel\n\n",
+            console_manager=console_manager,
+            icon=WidgetIcons.TEXT_INPUT,
+            color="blue",
+            warning=warning
+        )
+        
         self.fields = fields
-        self.console_manager = console_manager
         self.create_button_text = create_button_text
         self.cancel_button_text = cancel_button_text
 
@@ -38,15 +49,8 @@ class TextInputWidget:
         self.create_button_index = len(fields)
         self.cancel_button_index = len(fields) + 1
 
-    def prepare_title(self):
-        """Prepare the title with an input emoji"""
-        text = Text()
-        text.append("✏️ ", style="")  # Input emoji
-        text.append(self.title, style="blue")
-        return text
-
-    def _render_widget(self):
-        """Render the text input widget with all fields and buttons"""
+    def prepare_input_content(self):
+        """Prepare the content with all fields and buttons"""
         content = Text()
 
         # Render fields
@@ -105,45 +109,23 @@ class TextInputWidget:
                 ),
             )
         )
+        
+        return content
 
-        # Instructions
-        instructions = Text(
-            "Use Tab/↑↓/←→ to navigate, Enter to confirm, Ctrl+C to cancel\n\n",
-            style="dim",
-        )
+    def _render_input_widget(self):
+        """Render the text input widget"""
+        content = self.prepare_input_content()
+        panel = self.construct_panel(content)
+        self.render(panel)
 
-        # Assemble the panel
-        panel_content = Text.assemble(
-            instructions, self.prepare_title(), "\n\n", content
-        )
-
-        panel = Panel(panel_content, border_style="blue")
-
-        # Handle rendering and cursor positioning
-        if not hasattr(self, "_first_render"):
-            # First time rendering
-            with self.console_manager.console.capture() as capture:
-                self.console_manager.console.print(panel)
-            # Count actual rendered lines
-            self._panel_lines = len(capture.get().split("\n")) - 1
-            # Print the actual panel
-            self.console_manager.console.print(panel)
-            self._first_render = True
-        else:
-            # Move cursor up by the number of lines in the panel
-            print(f"\033[{self._panel_lines}A", end="")
-            # Clear from cursor to end of screen
-            print("\033[J", end="")
-            self.console_manager.console.print(panel)
-
-    def _handle_text_input(self, key, field_idx):
+    def _handle_text_input(self, k, field_idx):
         """Handle text input for a specific field"""
         # Current state
         current_value = self.values[field_idx]
         cursor_pos = self.cursor_positions[field_idx]
 
         # Handle backspace
-        if key == "\x7f":  # Backspace
+        if k == key.BACKSPACE:  # Backspace
             if cursor_pos > 0:
                 # Remove the character before the cursor
                 self.values[field_idx] = (
@@ -151,14 +133,17 @@ class TextInputWidget:
                 )
                 self.cursor_positions[field_idx] = cursor_pos - 1
         # Handle delete
-        elif key == "\x1b":
-            # This could be an arrow key or delete key sequence
-            return "special"
+        elif k == key.DELETE:
+            if cursor_pos < len(current_value):
+                # Remove the character at the cursor
+                self.values[field_idx] = (
+                    current_value[:cursor_pos] + current_value[cursor_pos + 1:]
+                )
         # Handle normal character input
-        elif key.isprintable():
+        elif len(k) == 1 and k.isprintable():
             # Insert the character at cursor position
             self.values[field_idx] = (
-                current_value[:cursor_pos] + key + current_value[cursor_pos:]
+                current_value[:cursor_pos] + k + current_value[cursor_pos:]
             )
             self.cursor_positions[field_idx] = cursor_pos + 1
 
@@ -171,36 +156,21 @@ class TextInputWidget:
         Returns:
             Dict mapping field names to values, or None if canceled
         """
-        import sys
-        import termios
-        import tty
-
-        def getch():
-            """Read a single character from stdin."""
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            try:
-                tty.setraw(fd)
-                ch = sys.stdin.read(1)
-            finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-            return ch
-
         while True:
-            self._render_widget()
+            self._render_input_widget()
 
-            key = getch()
+            k = readkey()
 
-            # Ctrl+C to cancel
-            if key == "\x03":
+            # Handle exit (Ctrl+C, q, Q)
+            if self.handle_exit(k):
                 return None
 
             # Tab key to move between fields
-            elif key == "\t":
+            elif k == key.TAB:
                 self.active_index = (self.active_index + 1) % (len(self.fields) + 2)
 
             # Enter key
-            elif key == "\r" or key == "\n":
+            elif k == key.ENTER:
                 # If on a button
                 if self.active_index == self.create_button_index:
                     # Return the field values
@@ -214,52 +184,37 @@ class TextInputWidget:
                     # Move to next field or to create button
                     self.active_index = (self.active_index + 1) % (len(self.fields) + 2)
 
-            # Arrow key or special key sequence
-            elif key == "\x1b":
-                seq = getch()
-                if seq == "[":
-                    direction = getch()
+            # Arrow key navigation
+            elif k == key.UP or k == key.LEFT:
+                # If we're at the Cancel button and want to go left
+                if self.active_index == self.cancel_button_index and k == key.LEFT:
+                    # Move to Create button
+                    self.active_index = self.create_button_index
+                else:
+                    # Normal backward navigation
+                    self.active_index = (self.active_index - 1) % (len(self.fields) + 2)
 
-                    if direction in ["A", "D"]:  # Up arrow or Left arrow
-                        # If we're at the Cancel button and want to go left
-                        if (
-                            self.active_index == self.cancel_button_index
-                            and direction == "D"
-                        ):
-                            # Move to Create button
-                            self.active_index = self.create_button_index
-                        else:
-                            # Normal backward navigation
-                            self.active_index = (self.active_index - 1) % (
-                                len(self.fields) + 2
-                            )
+            elif k == key.DOWN or k == key.RIGHT:
+                # If we're at the Create button and want to go right
+                if self.active_index == self.create_button_index and k == key.RIGHT:
+                    # Move to Cancel button
+                    self.active_index = self.cancel_button_index
+                else:
+                    # Normal forward navigation
+                    self.active_index = (self.active_index + 1) % (len(self.fields) + 2)
 
-                    elif direction in ["B", "C"]:  # Down arrow or Right arrow
-                        # If we're at the Create button and want to go right
-                        if (
-                            self.active_index == self.create_button_index
-                            and direction == "C"
-                        ):
-                            # Move to Cancel button
-                            self.active_index = self.cancel_button_index
-                        else:
-                            # Normal forward navigation
-                            self.active_index = (self.active_index + 1) % (
-                                len(self.fields) + 2
-                            )
-
-                    # Handle cursor movement within text fields
-                    if self.active_index < len(self.fields):
-                        field_idx = self.active_index
-                        if direction == "C" and self.cursor_positions[field_idx] < len(
-                            self.values[field_idx]
-                        ):
-                            # Move cursor right
-                            self.cursor_positions[field_idx] += 1
-                        elif direction == "D" and self.cursor_positions[field_idx] > 0:
-                            # Move cursor left
-                            self.cursor_positions[field_idx] -= 1
-
-            # Handle text input if we're on a field
+            # Handle cursor movement within text fields
             elif self.active_index < len(self.fields):
-                self._handle_text_input(key, self.active_index)
+                field_idx = self.active_index
+                
+                if k == key.RIGHT and self.cursor_positions[field_idx] < len(
+                    self.values[field_idx]
+                ):
+                    # Move cursor right
+                    self.cursor_positions[field_idx] += 1
+                elif k == key.LEFT and self.cursor_positions[field_idx] > 0:
+                    # Move cursor left
+                    self.cursor_positions[field_idx] -= 1
+                else:
+                    # Handle text input if we're on a field
+                    self._handle_text_input(k, self.active_index)

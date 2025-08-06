@@ -1,10 +1,12 @@
 from typing import Optional, List, Set, Tuple, Union
-from rich.panel import Panel
 from rich.text import Text
 from ..managers import ConsoleManager
+from .console_widget import ConsoleWidget
+from .widget_icons import WidgetIcons
+from readchar import key, readkey
 
 
-class CreateDeleteCheckboxSelector:
+class CreateDeleteCheckboxSelector(ConsoleWidget):
     """
     A checkbox selector with delete, create, and done action buttons.
 
@@ -24,29 +26,29 @@ class CreateDeleteCheckboxSelector:
     ACTION_DONE = "done"
 
     def __init__(
-        self, message: str, options: List[str], console_manager: ConsoleManager
+        self, 
+        message: str, 
+        options: List[str], 
+        console_manager: ConsoleManager,
+        warning: str = ""
     ):
+        super().__init__(
+            message=message,
+            instructions="Use ↑↓ to navigate, Space to toggle selection, 'a' to select all, "
+                        "Enter to confirm, 'd' to delete, 'c' to create, 's' for done, Ctrl+C to cancel\n\n",
+            console_manager=console_manager,
+            icon=WidgetIcons.CHECKBOX,
+            color="blue",
+            warning=warning
+        )
+        
         self.cursor_index = 0
         self.selected_indices = set()
-        self.console_manager = console_manager
-        self.message = message
         self.options = options
-        self.button_index = (
-            -1
-        )  # -1 for no button, 0 for Delete, 1 for Create, 2 for Done
-        self._first_render = False
-        self._panel_lines = 0
+        self.button_index = -1  # -1 for no button, 0 for Delete, 1 for Create, 2 for Done
 
-    def prepare_message(self):
-        """Print question message in blue with checkbox emoji and border"""
-        text = Text()
-        text.append("✓ ", style="")  # Checkbox emoji
-        text.append(self.message, style="blue")
-        text.append("\n")
-        return text
-
-    def _render_options(self):
-        """Render the checkbox selection options and action buttons."""
+    def prepare_options_and_buttons(self):
+        """Prepare the checkbox selection options and action buttons."""
         content = Text()
 
         # Render list options with checkboxes
@@ -75,35 +77,14 @@ class CreateDeleteCheckboxSelector:
         content.append("  [Create]  ", style=f"green {create_style}")
         content.append("   ")
         content.append("  [Done]  ", style=f"blue {done_style}")
+        
+        return content
 
-        # Add instructions
-        instructions = Text(
-            "Use ↑↓ to navigate, Space to toggle selection, 'a' to select all, "
-            "Enter to confirm, 'd' to delete, 'c' to create, 's' for done, Ctrl+C to cancel\n\n",
-            style="dim",
-        )
-
-        panel_content = Text.assemble(
-            instructions, self.prepare_message(), "\n", content
-        )
-
-        panel = Panel(panel_content, border_style="blue")
-
-        if not self._first_render:
-            # First time rendering
-            with self.console_manager.console.capture() as capture:
-                self.console_manager.console.print(panel)
-            # Count actual rendered lines
-            self._panel_lines = len(capture.get().split("\n")) - 1
-            # Print the actual panel
-            self.console_manager.console.print(panel)
-            self._first_render = True
-        else:
-            # Move cursor up by the number of lines in the panel
-            print(f"\033[{self._panel_lines}A", end="")
-            # Clear from cursor to end of screen
-            print("\033[J", end="")
-            self.console_manager.console.print(panel)
+    def _render_widget(self):
+        """Render the widget"""
+        content = self.prepare_options_and_buttons()
+        panel = self.construct_panel(content)
+        self.render(panel)
 
     def select(self) -> Tuple[str, Union[List[str], None]]:
         """
@@ -114,28 +95,17 @@ class CreateDeleteCheckboxSelector:
             - action: One of ACTION_CREATE, ACTION_DELETE, ACTION_SELECT, ACTION_CANCEL, ACTION_DONE
             - selection: Either a list of selected items or None
         """
-        import sys
-        import termios
-        import tty
-
-        def getch():
-            """Read a single character from stdin."""
-            fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
-            try:
-                tty.setraw(fd)
-                ch = sys.stdin.read(1)
-            finally:
-                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-            return ch
-
         while True:
-            self._render_options()
-
-            key = getch()
+            self._render_widget()
+            
+            k = readkey()
+            
+            # Handle exit (Ctrl+C, q, Q)
+            if self.handle_exit(k):
+                return (self.ACTION_CANCEL, None)
 
             # Delete key
-            if key == "d" or key == "D":
+            if k.lower() == "d":
                 if not self.selected_indices:
                     # If nothing explicitly selected, use current highlighted item
                     return (self.ACTION_DELETE, [self.options[self.cursor_index]])
@@ -145,59 +115,52 @@ class CreateDeleteCheckboxSelector:
                 )
 
             # Create key
-            elif key == "c" or key == "C":
+            elif k.lower() == "c":
                 return (self.ACTION_CREATE, None)
 
             # Done key (using 's' for "save and continue")
-            elif key == "s" or key == "S":
+            elif k.lower() == "s":
                 return (
                     self.ACTION_DONE,
                     [self.options[i] for i in self.selected_indices],
                 )
 
             # Arrow key handling
-            elif key == "\x1b":
-                next1, next2 = getch(), getch()
-                if next1 == "[":
-                    if next2 == "A":  # Up arrow
-                        if self.button_index != -1:
-                            # Move focus back to the list
-                            self.button_index = -1
-                        else:
-                            # Navigate up within the list
-                            self.cursor_index = (self.cursor_index - 1) % len(
-                                self.options
-                            )
-                    elif next2 == "B":  # Down arrow
-                        if self.button_index == -1:
-                            if self.cursor_index == len(self.options) - 1:
-                                # Move from last list item to the Delete button
-                                self.button_index = 0
-                            else:
-                                # Navigate down within the list
-                                self.cursor_index = (self.cursor_index + 1) % len(
-                                    self.options
-                                )
-                    elif next2 == "C":  # Right arrow
-                        if self.button_index == 0:
-                            self.button_index = 1  # Move from Delete to Create
-                        elif self.button_index == 1:
-                            self.button_index = 2  # Move from Create to Done
-                    elif next2 == "D":  # Left arrow
-                        if self.button_index == 1:
-                            self.button_index = 0  # Move from Create to Delete
-                        elif self.button_index == 2:
-                            self.button_index = 1  # Move from Done to Create
+            elif k == key.UP:
+                if self.button_index != -1:
+                    # Move focus back to the list
+                    self.button_index = -1
+                else:
+                    # Navigate up within the list
+                    self.cursor_index = (self.cursor_index - 1) % len(self.options)
+            elif k == key.DOWN:
+                if self.button_index == -1:
+                    if self.cursor_index == len(self.options) - 1:
+                        # Move from last list item to the Delete button
+                        self.button_index = 0
+                    else:
+                        # Navigate down within the list
+                        self.cursor_index = (self.cursor_index + 1) % len(self.options)
+            elif k == key.RIGHT:
+                if self.button_index == 0:
+                    self.button_index = 1  # Move from Delete to Create
+                elif self.button_index == 1:
+                    self.button_index = 2  # Move from Create to Done
+            elif k == key.LEFT:
+                if self.button_index == 1:
+                    self.button_index = 0  # Move from Create to Delete
+                elif self.button_index == 2:
+                    self.button_index = 1  # Move from Done to Create
 
             # Space key to toggle selection
-            elif key == " " and self.button_index == -1:
+            elif k == key.SPACE and self.button_index == -1:
                 if self.cursor_index in self.selected_indices:
                     self.selected_indices.remove(self.cursor_index)
                 else:
                     self.selected_indices.add(self.cursor_index)
 
             # 'a' key to select all or clear all
-            elif key.lower() == "a":
+            elif k.lower() == "a":
                 if len(self.selected_indices) == len(self.options):
                     # If all are selected, deselect all
                     self.selected_indices.clear()
@@ -206,7 +169,7 @@ class CreateDeleteCheckboxSelector:
                     self.selected_indices = set(range(len(self.options)))
 
             # Tab key to switch focus
-            elif key == "\t":
+            elif k == key.TAB:
                 if self.button_index == -1:
                     self.button_index = 0  # Focus on Delete button
                 elif self.button_index == 0:
@@ -217,7 +180,7 @@ class CreateDeleteCheckboxSelector:
                     self.button_index = -1  # Focus back on list
 
             # Enter key
-            elif key in ["\r", "\n"]:
+            elif k == key.ENTER:
                 if self.button_index == 0:  # Delete button
                     if not self.selected_indices:
                         # If nothing explicitly selected, use current highlighted item
@@ -241,7 +204,3 @@ class CreateDeleteCheckboxSelector:
                         self.ACTION_SELECT,
                         [self.options[i] for i in self.selected_indices],
                     )
-
-            # Ctrl+C
-            elif key == "\x03":
-                return (self.ACTION_CANCEL, None)
