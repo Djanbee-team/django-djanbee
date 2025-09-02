@@ -130,10 +130,26 @@ Currently, Djanbee is optimized for PostgreSQL with peer authentication, which:
 - Socket file has 660 permissions owned by www-data group
 - Static/media directories have 755 permissions with www-data ownership
 
-## License
-
-[Insert your license information here]
-
 ## Contributing
 
-[Insert contribution guidelines here]
+We welcome contributions to Djanbee! Here's how to get started:
+
+### Quick Start
+1. Fork the repository and clone your fork
+2. Create a new branch: `git checkout -b feature/your-feature`
+3. Make your changes following PEP 8 standards
+4. Test thoroughly on Linux/Ubuntu environments
+5. Commit with clear messages: `git commit -m "Add: description"`
+6. Push and create a Pull Request
+
+### What We Need
+- Bug fixes for deployment issues
+- New server configurations (Apache, different setups)
+- Database support improvements (MySQL, SQLite)
+- Documentation and security enhancements
+- Cross-platform support
+
+### Reporting Issues
+Include your OS, Python version, Django version, and error logs when reporting bugs.
+
+Questions? Open an issue or reach out to maintainers. Thanks for helping improve Djanbee! 🐝
