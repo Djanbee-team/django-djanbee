@@ -221,8 +221,8 @@ class EnvManager:
         # If we don't have a console manager, install without prompting
         if not self.console_manager:
             for package in packages:
-                success, _ = self.os_manager.install_pip_package(package)
-                if success:
+                success = self.os_manager.install_pip_package(package)
+                if success.success:
                     installed_packages.append(package)
                 else:
                     return False, f"Failed to install {package}", installed_packages
@@ -247,16 +247,16 @@ class EnvManager:
             )
             for package in packages:
                 self.console_manager.print_progress(f"Installing {package}...")
-                success, message = self.os_manager.install_pip_package(package)
+                success = self.os_manager.install_pip_package(package)
 
-                if success:
+                if success.success:
                     self.console_manager.print_step_progress(
                         "Package", f"{package} installed successfully"
                     )
                     installed_packages.append(package)
                 else:
                     self.console_manager.print_step_failure(
-                        "Package", f"Failed to install {package}: {message}"
+                        "Package", f"Failed to install {package}: {success.stderr}"
                     )
 
             if len(installed_packages) == len(packages):

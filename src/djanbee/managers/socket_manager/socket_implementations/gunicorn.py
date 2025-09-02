@@ -169,11 +169,11 @@ class GunicornSocketManager(BaseSocketManager):
             Tuple of (success, message)
         """
         try:
-            reload_success, reload_message = self.os_manager.reload_daemon()
-            if not reload_success:
-                self.console_manager.print_error(f"Failed to reload systemd daemon: {reload_message}")
+            reload_success = self.os_manager.reload_daemon()
+            if not reload_success.success:
+                self.console_manager.print_error(f"Failed to reload systemd daemon: {reload_success.stderr}")
             
-            return reload_success, reload_message
+            return reload_success.success, reload_success.stderr
         except Exception as e:
             error_msg = f"Error reloading systemd daemon: {str(e)}"
             self.console_manager.print_error(error_msg)
@@ -191,11 +191,11 @@ class GunicornSocketManager(BaseSocketManager):
         """
         try:
             service_name = f"gunicorn-{project_name}"
-            enable_success, enable_message = self.os_manager.enable_service(service_name)
+            enable_success = self.os_manager.enable_service(service_name)
             
-            if not enable_success:
-                self.console_manager.print_error(f"Failed to enable service: {enable_message}")
-                return False, f"Failed to enable service: {enable_message}"
+            if not enable_success.success:
+                self.console_manager.print_error(f"Failed to enable service: {enable_success.stderr}")
+                return False, f"Failed to enable service: {enable_success.stderr}"
             
             return True, f"Service '{service_name}' enabled successfully"
         except Exception as e:
@@ -215,11 +215,11 @@ class GunicornSocketManager(BaseSocketManager):
         """
         try:
             service_name = f"gunicorn-{project_name}"
-            success, message = self.os_manager.start_service(service_name)
+            success = self.os_manager.start_service(service_name)
             
-            if not success:
-                self.console_manager.print_error(f"Failed to start socket service: {message}")
-                return False, f"Failed to start socket service: {message}"
+            if not success.success:
+                self.console_manager.print_error(f"Failed to start socket service: {success.stderr}")
+                return False, f"Failed to start socket service: {success.stderr}"
             
             return True, f"Socket service '{service_name}' started successfully"
         except Exception as e:
@@ -296,36 +296,36 @@ class GunicornSocketManager(BaseSocketManager):
                 self.console_manager.print_progress(f"Attempting to create {run_gunicorn_path}")
 
                 # We need to use sudo to create directory in /run
-                create_result, create_message = self.os_manager.run_command(
+                create_result = self.os_manager.run_command(
                     ["sudo", "mkdir", "-p", run_gunicorn_path]
                 )
-                if not create_result:
+                if not create_result.success:
                     return (
                         False,
-                        f"Failed to create {run_gunicorn_path} directory: {create_message}",
+                        f"Failed to create {run_gunicorn_path} directory: {create_result.stderr}",
                     )
 
                 # Get current username
                 username = self.os_manager.get_username()
 
                 # Set ownership to current user
-                chown_result, chown_message = self.os_manager.run_command(
+                chown_result = self.os_manager.run_command(
                     ["sudo", "chown", f"{username}:{username}", run_gunicorn_path]
                 )
-                if not chown_result:
+                if not chown_result.success:
                     return (
                         False,
-                        f"Failed to set permissions on {run_gunicorn_path}: {chown_message}",
+                        f"Failed to set permissions on {run_gunicorn_path}: {chown_result.stderr}",
                     )
                 # Set directory permissions
-                chmod_result, chmod_message = self.os_manager.run_command(
+                chmod_result = self.os_manager.run_command(
                     ["sudo", "chmod", "755", run_gunicorn_path]
                 )
 
-                if not chmod_result:
+                if not chmod_result.success:
                     return (
                         False,
-                        f"Failed to set directory permissions: {chmod_message}",
+                        f"Failed to set directory permissions: {chown_result.stderr}",
                     )
 
                 # Return success message instead of printing
@@ -333,24 +333,24 @@ class GunicornSocketManager(BaseSocketManager):
 
             # If directory exists, check if current user has write access
             username = self.os_manager.get_username()
-            access_check, access_message = self.os_manager.run_command(
+            access_check = self.os_manager.run_command(
                 ["test", "-w", run_gunicorn_path]
             )
 
-            if not access_check:
+            if not access_check.success:
                 self.console_manager.print_warning(
                     f"User '{username}' does not have write access to {run_gunicorn_path}. Attempting to fix permissions..."
                 )
 
                 # Try to fix permissions
-                fix_result, fix_message = self.os_manager.run_command(
+                fix_result = self.os_manager.run_command(
                     ["sudo", "chown", f"{username}:{username}", run_gunicorn_path]
                 )
 
-                if not fix_result:
+                if not fix_result.success:
                     return (
                         False,
-                        f"Failed to set permissions on existing {run_gunicorn_path} directory: {fix_message}",
+                        f"Failed to set permissions on existing {run_gunicorn_path} directory: {fix_result.stderr}",
                     )
 
                 # Return success message instead of printing

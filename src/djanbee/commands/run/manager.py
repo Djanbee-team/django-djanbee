@@ -47,14 +47,14 @@ class RunManager:
             
             # Create migration files
             makemigrations_result = self.app.os_manager.run_python_command(["manage.py", "makemigrations"])
-            if makemigrations_result:
+            if makemigrations_result.success:
                 self.display.show_makemigrations_complete()
             else:
                 raise Exception("Failed to create migration files")
             
             # Apply migrations
             migrate_result = self.app.os_manager.run_python_command(["manage.py", "migrate"])
-            if migrate_result:
+            if migrate_result.success:
                 self.display.show_migrate_complete()
                 self.operation_results["Database Migrations"] = True
                 return True
@@ -75,7 +75,7 @@ class RunManager:
         try:
             self.display.show_collect_static_start()
             result = self.app.os_manager.run_python_command(["manage.py", "collectstatic", "--noinput"])
-            if result:
+            if result.success:
                 self.display.show_collect_static_complete()
                 self.operation_results["Static Files Collection"] = True
                 return True

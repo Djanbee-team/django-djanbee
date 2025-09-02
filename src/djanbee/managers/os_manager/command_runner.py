@@ -22,6 +22,7 @@ class CommandResult:
        yield self.success
        yield msg
 
+
 class CommandRunner:
    def run(
        self,

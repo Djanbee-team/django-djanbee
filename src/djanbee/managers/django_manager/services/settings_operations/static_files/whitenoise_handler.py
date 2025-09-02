@@ -266,12 +266,12 @@ class WhiteNoiseHandler(StaticFilesHandler):
             result = self.settings_service.os_manager.run_command(
                 [str(pip_path), "install", "whitenoise"]
             )
-            if result[0]:
+            if result.success:
                 self.display.console_manager.print_success("WhiteNoise installed successfully")
                 return True, "WhiteNoise installed successfully"
             else:
-                self.display.console_manager.print_error(f"Failed to install WhiteNoise: {result[1]}")
-                return False, f"Failed to install WhiteNoise: {result[1]}"
+                self.display.console_manager.print_error(f"Failed to install WhiteNoise: {result.stderr}")
+                return False, f"Failed to install WhiteNoise: {result.stderr}"
         except Exception as e:
             error_msg = f"Error installing WhiteNoise: {str(e)}"
             self.display.console_manager.print_error(error_msg)

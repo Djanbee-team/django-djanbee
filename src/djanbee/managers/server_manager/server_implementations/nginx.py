@@ -24,40 +24,45 @@ class NginxServerManager(BaseServerManager):
 
     def check_server_installed(self) -> bool:
         """Checks if Nginx is installed"""
-        return self.os_manager.check_package_installed(self.server_name)
+        return self.os_manager.check_package_installed(self.server_name).success
 
-    def install_server(self) -> Tuple[bool, str]:
+    def install_server(self) -> CommandResult:
         """Installs Nginx if not already installed"""
         if self.check_server_installed():
-            return True, "Nginx is already installed"
+            return CommandResult(
+                success=True,
+                stdout="Nginx is already installed",
+                stderr="",
+                exit_code=0,
+            )
 
         return self.os_manager.install_package(self.server_name)
 
-    def start_server(self) -> Tuple[bool, str]:
+    def start_server(self) -> CommandResult:
         """Starts the Nginx server"""
         return self.os_manager.start_service(self.server_name)
 
-    def stop_server(self) -> Tuple[bool, str]:
+    def stop_server(self) -> CommandResult:
         """Stops the Nginx server"""
         return self.os_manager.stop_service(self.server_name)
 
-    def restart_server(self) -> Tuple[bool, str]:
+    def restart_server(self) -> CommandResult:
         """Restarts the Nginx server"""
         return self.os_manager.restart_service(self.server_name)
 
-    def enable_server(self) -> Tuple[bool, str]:
+    def enable_server(self) -> CommandResult:
         """Enables Nginx to start on boot"""
         return self.os_manager.enable_service(self.server_name)
 
-    def check_server_status(self) -> bool:
+    def check_server_status(self) -> CommandResult:
         """Checks if Nginx is running"""
         return self.os_manager.check_service_status(self.server_name)
 
     def get_server_version(self) -> str:
         """Gets the Nginx version"""
-        success, output = self.os_manager.run_command([self.server_name, "-v"])
-        if success:
-            return output
+        success = self.os_manager.run_command([self.server_name, "-v"])
+        if success.success:
+            return success.stdout
         else:
             return "Unknown version"
 
@@ -70,10 +75,16 @@ class NginxServerManager(BaseServerManager):
         """Checks if Gunicorn is installed via pip"""
         return self.os_manager.check_pip_package_installed("gunicorn")
 
-    def install_gunicorn(self) -> tuple[bool, str] | CommandResult:
-        """Installs Gunicorn if not already installed"""
-        if self.check_gunicorn_installed():
-            return True, "Gunicorn is already installed"
+    def install_gunicorn(self) -> CommandResult:
+        """Installs Gunicorn if not already installed."""
+        check_res = self.check_gunicorn_installed()
+        if check_res.success if isinstance(check_res, CommandResult) else check_res:
+            return CommandResult(
+                success=True,
+                stdout="Gunicorn is already installed",
+                stderr="",
+                exit_code=0,
+            )
         return self.os_manager.install_pip_package("gunicorn")
 
     def verify_dependencies(self) -> List[Tuple[str, bool, str]]:
@@ -185,8 +196,8 @@ class NginxServerManager(BaseServerManager):
 
             # Get the nginx user (typically www-data on Ubuntu/Debian or nginx on CentOS/RHEL)
             # First check if nginx user exists
-            nginx_user_exists, _ = self.os_manager.run_command(["id", "-u", "nginx"])
-            if nginx_user_exists:
+            nginx_user_exists = self.os_manager.run_command(["id", "-u", "nginx"])
+            if nginx_user_exists.success:
                 web_user = "nginx"
             else:
                 # Fall back to www-data which is common on Debian/Ubuntu
@@ -209,7 +220,7 @@ class NginxServerManager(BaseServerManager):
 
             # Also ensure socket file is accessible to Nginx
             chmod_socket_command = ["sudo", "chmod", "660", str(socket_path)]
-            result, message = self.os_manager.run_command(chmod_socket_command)
+            result = self.os_manager.run_command(chmod_socket_command)
             chown_socket_command = [
                 "sudo",
                 "chown",
@@ -264,22 +275,22 @@ class NginxServerManager(BaseServerManager):
                     str(config_file_path),
                     str(enabled_path),
                 ]
-                link_success, link_message = self.os_manager.run_command(
+                link_success = self.os_manager.run_command(
                     symlink_command
                 )
 
-                if not link_success:
+                if not link_success.success:
                     return (
                         False,
-                        f"Failed to enable Nginx configuration: {link_message}",
+                        f"Failed to enable Nginx configuration: {link_success.stderr}",
                     )
 
             # Test the Nginx configuration
-            test_success, test_message = self.os_manager.run_command(
+            test_success = self.os_manager.run_command(
                 ["sudo", "nginx", "-t"]
             )
-            if not test_success:
-                return False, f"Nginx configuration test failed: {test_message}"
+            if not test_success.success:
+                return False, f"Nginx configuration test failed: {test_success.stderr}"
 
             # Reload Nginx to apply changes
             reload_success, reload_message = self.restart_server()
@@ -355,12 +366,12 @@ class NginxServerManager(BaseServerManager):
         default_config_path = Path("/etc/nginx/sites-enabled/default")
         return self.os_manager.check_file_exists(default_config_path)
 
-    def remove_default_site(self) -> Tuple[bool, str]:
+    def remove_default_site(self) -> CommandResult:
         """Remove the default site from sites-enabled."""
         default_config_path = Path("/etc/nginx/sites-enabled/default")
         return self.os_manager.run_command(["sudo", "rm", str(default_config_path)])
 
-    def test_configuration(self) -> Tuple[bool, str]:
+    def test_configuration(self) -> CommandResult:
         """Test the Nginx configuration."""
         return self.os_manager.run_command(["sudo", "nginx", "-t"])
 
