@@ -32,6 +32,8 @@ dependencies = [
     "gunicorn>=20.0.0",
     "python-dotenv",
     "click",
+    "rich",
+    "readchar",
 ]
 
 [project.urls]

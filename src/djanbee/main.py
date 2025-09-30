@@ -128,6 +128,10 @@ def run(path: str):
     except Exception as e:
         print(f"Error {e}")
 
+# Entry point for the CLI
+def main():
+    cli()
+
 
 if __name__ == "__main__":
-    cli()
+    main()
