@@ -9,7 +9,7 @@ Djanbee automates the critical configuration steps needed to transition a Django
 ## Installation
 
 ```bash
-pip install djanbee
+pip install django-djanbee
 ```
 
 ## Requirements
